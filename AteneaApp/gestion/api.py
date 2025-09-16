@@ -199,3 +199,41 @@ def categorias_old(request):
         categorias = Categoria.objects.filter(tipificacion_id=tipificacion_id).values('id', 'nombre')
         return JsonResponse(list(categorias), safe=False)
     return JsonResponse({'error': 'tipificacion_id requerido'}, status=400)
+
+
+# --- Segmentos IV, V, VI ---
+def segmentos_iv(request):
+    segmento_iii_id = request.GET.get('segmento_iii_id')
+    if not segmento_iii_id:
+        return JsonResponse({'error': 'segmento_iii_id requerido'}, status=400)
+    data = SegmentoIV.objects.filter(segmento_iii_id=segmento_iii_id).values('id', 'nombre').order_by('nombre')
+    return JsonResponse(list(data), safe=False)
+
+def segmentos_v(request):
+    segmento_iv_id = request.GET.get('segmento_iv_id')
+    if not segmento_iv_id:
+        return JsonResponse({'error': 'segmento_iv_id requerido'}, status=400)
+    data = SegmentoV.objects.filter(segmento_iv_id=segmento_iv_id).values('id', 'nombre').order_by('nombre')
+    return JsonResponse(list(data), safe=False)
+
+def segmentos_vi(request):
+    segmento_v_id = request.GET.get('segmento_v_id')
+    if not segmento_v_id:
+        return JsonResponse({'error': 'segmento_v_id requerido'}, status=400)
+    data = SegmentoVI.objects.filter(segmento_v_id=segmento_v_id).values('id', 'nombre').order_by('nombre')
+    return JsonResponse(list(data), safe=False)
+
+# --- Subcategorías N4 y N5 ---
+def subcategorias_iv(request):
+    categoria_padre_id = request.GET.get('categoria_padre_id')
+    if not categoria_padre_id:
+        return JsonResponse({'error': 'categoria_padre_id requerido'}, status=400)
+    data = Categoria.objects.filter(categoria_padre_id=categoria_padre_id, nivel=4).values('id','nombre').order_by('nombre')
+    return JsonResponse(list(data), safe=False)
+
+def subcategorias_v(request):
+    categoria_padre_id = request.GET.get('categoria_padre_id')
+    if not categoria_padre_id:
+        return JsonResponse({'error': 'categoria_padre_id requerido'}, status=400)
+    data = Categoria.objects.filter(categoria_padre_id=categoria_padre_id, nivel=5).values('id','nombre').order_by('nombre')
+    return JsonResponse(list(data), safe=False)

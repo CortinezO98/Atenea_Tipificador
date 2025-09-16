@@ -3,6 +3,8 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 
 
+# ===================== MAESTROS =====================
+
 class TipoIdentificacion(models.Model):
     nombre = models.CharField(max_length=100)
 
@@ -31,10 +33,10 @@ class Ciudadano(models.Model):
     tipo_identificacion = models.ForeignKey(TipoIdentificacion, on_delete=models.CASCADE)
     numero_identificacion = models.CharField(max_length=20, unique=True)
     nombre = models.CharField(max_length=255)
-    correo  = models.EmailField("Correo electrónico", max_length=254, blank=True)
+    correo = models.EmailField("Correo electrónico", max_length=254, blank=True)
     telefono = models.CharField("Teléfono", max_length=20, blank=True)
     direccion_residencia = models.CharField("Dirección de residencia", max_length=255, blank=True)
-    pais  = models.ForeignKey(Pais, on_delete=models.PROTECT, null=True, blank=True)
+    pais = models.ForeignKey(Pais, on_delete=models.PROTECT, null=True, blank=True)
     ciudad = models.CharField(max_length=100, null=True, blank=True)
 
     class Meta:
@@ -192,7 +194,7 @@ class Evaluacion(models.Model):
     observacion = models.TextField()
     ciudadano = models.ForeignKey(Ciudadano, on_delete=models.CASCADE)
 
-    # Tipificación (árbol de categorías hasta nivel 6)
+    # Tipificación y categoría final (1→6)
     tipificacion = models.ForeignKey(Tipificacion, on_delete=models.CASCADE, null=True, blank=True)
     categoria = models.ForeignKey(Categoria, on_delete=models.CASCADE, null=True, blank=True)
 
@@ -209,22 +211,10 @@ class Evaluacion(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     fecha = models.DateTimeField(auto_now=True)
 
-    # Campo especial para "OTROS DELITOS"
-    cual_otro_delito = models.CharField(
-        max_length=500, blank=True, null=True,
-        verbose_name="¿Cuál otro delito?",
-        help_text="Solo se llena cuando se selecciona 'OTROS DELITOS'"
-    )
-
-    # Preguntas adicionales (URI / consulta jurídica)
-    se_comunica_uri = models.BooleanField(null=True, blank=True, verbose_name="Se comunica de una URI")
-    ciudad_municipio_uri = models.CharField(max_length=200, blank=True, verbose_name="Ciudad/Municipio URI")
-    consulta_juridica = models.BooleanField(null=True, blank=True, verbose_name="Consulta jurídica")
-
     # Contacto si es anónimo
     es_anonimo = models.BooleanField(default=False, db_index=True)
-    contacto_correo   = models.EmailField("Correo de contacto", max_length=254, blank=True, null=True, db_index=True)
-    contacto_telefono = models.CharField("Teléfono de contacto", max_length=20,  blank=True, null=True, db_index=True)
+    contacto_correo = models.EmailField("Correo de contacto", max_length=254, blank=True, null=True, db_index=True)
+    contacto_telefono = models.CharField("Teléfono de contacto", max_length=20, blank=True, null=True, db_index=True)
     contacto_telefono_inconcer = models.CharField("Teléfono Inconcer (contacto)", max_length=20, blank=True, null=True, db_index=True)
 
     class Meta:
@@ -236,19 +226,23 @@ class Evaluacion(models.Model):
         return f"{self.ciudadano.nombre} - {self.fecha}"
 
 
-# ===================== ENCUESTA (lógica anterior conservada) =====================
+# ===================== ENCUESTA =====================
 
 class Encuesta(models.Model):
     """
     Encuesta asociada 1:N a Evaluacion. Token único y expiración.
+    Los campos de métricas (abajo) se mantienen por compatibilidad,
+    pero la recomendación es usar RespuestaEncuesta para almacenar respuestas.
     """
     evaluacion = models.ForeignKey(Evaluacion, on_delete=models.CASCADE, related_name='encuestas')
 
+    # --- (LEGADO / Compatibilidad) ---
     dominioPersonaAtendio = models.IntegerField(null=True, blank=True)
     satisfaccionServicioRecibido = models.IntegerField(null=True, blank=True)
     tiempoEsperaServicio = models.IntegerField(null=True, blank=True)
     recomendacionCanalAtencion = models.IntegerField(null=True, blank=True)
     solucionSolicitud = models.BooleanField(null=True, blank=True)
+    # ----------------------------------
 
     idInteraccion = models.CharField(max_length=150)
     seleccionarCanal = models.CharField(max_length=150, null=True, blank=True)
@@ -270,6 +264,47 @@ class Encuesta(models.Model):
     def expirada(self):
         return timezone.now() > self.fechaExpiracionLink
 
+
+# ===================== PREGUNTAS DINÁMICAS DE ENCUESTA =====================
+
+class PreguntaEncuesta(models.Model):
+    texto = models.CharField(max_length=255)
+    tipo = models.CharField(
+        max_length=20,
+        choices=[("escala", "Escala 1-5"), ("si_no", "Sí/No")],
+        default="escala"
+    )
+    orden = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        verbose_name = "Pregunta de Encuesta"
+        verbose_name_plural = "Preguntas de Encuesta"
+        ordering = ["orden"]
+
+    def __str__(self):
+        return f"{self.orden}. {self.texto}"
+
+
+class RespuestaEncuesta(models.Model):
+    encuesta = models.ForeignKey(Encuesta, on_delete=models.CASCADE, related_name="respuestas")
+    pregunta = models.ForeignKey(PreguntaEncuesta, on_delete=models.CASCADE)
+    valor = models.CharField(max_length=10)
+
+    class Meta:
+        verbose_name = "Respuesta de Encuesta"
+        verbose_name_plural = "Respuestas de Encuesta"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["encuesta", "pregunta"],
+                name="uniq_encuesta_pregunta"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.pregunta.texto} → {self.valor}"
+
+
+# ===================== LOG ERRORES =====================
 
 class RegistroError(models.Model):
     metodo = models.CharField(max_length=100)

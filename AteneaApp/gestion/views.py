@@ -7,6 +7,8 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.views.decorators.http import require_GET
 from django.utils.timezone import now, make_aware, localtime
+from django.utils.crypto import get_random_string
+from django.urls import reverse
 from usuarios.views import ValidarRolUsuario, en_grupo
 from usuarios.enums import Roles
 from .models import *
@@ -17,7 +19,10 @@ from datetime import datetime, timedelta
 import openpyxl
 from openpyxl.utils import get_column_letter
 import inspect
-
+from django.shortcuts import get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.html import format_html 
+from .forms import build_encuesta_form
 
 def index(request):
     if request.user.is_authenticated:
@@ -70,7 +75,8 @@ def crear_evaluacion(request):
 
                 # === CATEGORÍAS: tomar el nivel más profundo disponible (1→6) ===
                 categoria_final_id = None
-                for key in ('subcategoria_v', 'subcategoria_iv', 'subcategoria_iii', 'subcategoria_ii', 'subcategoria', 'categoria'):
+                for key in ('subcategoria_vi', 'subcategoria_v', 'subcategoria_iv',
+                            'subcategoria_iii', 'subcategoria_ii', 'subcategoria', 'categoria'):
                     val = request.POST.get(key)
                     if val:
                         categoria_final_id = val
@@ -107,6 +113,27 @@ def crear_evaluacion(request):
                     contacto_telefono_inconcer = tel_inconser,
                 )
 
+                # === Crear encuesta de satisfacción (token + expiración) ===
+                token = get_random_string(24)
+                expira = now() + timedelta(days=7)
+
+                encuesta = Encuesta.objects.create(
+                    evaluacion=evaluacion,
+                    idInteraccion=request.POST.get('conversacion_id', ''),
+                    nombreAgente=request.user.get_full_name() or request.user.username,
+                    token=token,
+                    fechaExpiracionLink=expira,
+                    fecha_creacion=now()
+                )
+
+                encuesta_url = request.build_absolute_uri(
+                    reverse('encuesta_publica', kwargs={'token': token})
+                )
+
+                encuesta_url = request.build_absolute_uri(
+                    reverse('encuesta_publica', kwargs={'token': token})
+                )
+
                 debug_info = {
                     'tipo_canal': request.POST.get('tipo_canal'),
                     'segmento': request.POST.get('segmento'),
@@ -122,12 +149,21 @@ def crear_evaluacion(request):
                     'subcategoria_iii': request.POST.get('subcategoria_iii'),
                     'subcategoria_iv': request.POST.get('subcategoria_iv'),
                     'subcategoria_v': request.POST.get('subcategoria_v'),
+                    'subcategoria_vi': request.POST.get('subcategoria_vi'),
                     'categoria_final_id': categoria_final_id,
                     'es_anonimo': request.POST.get('es_anonimo'),
                     'telefono_inconcer': tel_inconser,
+                    'encuesta_token': encuesta.token,
                 }
                 print(f"DEBUG - Crear evaluación: {debug_info}")
-                messages.success(request, "Evaluación guardada correctamente.")
+
+                messages.success(
+                    request,
+                    format_html(
+                        'Evaluación guardada. Enlace de encuesta: <a href="{}" target="_blank" rel="noopener">abrir</a>',
+                        encuesta_url
+                    )
+                )
 
         except Exception as e:
             RegistrarError(inspect.currentframe().f_code.co_name, str(e), request)
@@ -394,8 +430,7 @@ def exportar_excel(request):
         'Tipo Canal', 'Segmento I', 'Segmento II', 'Segmento III', 'Segmento IV', 'Segmento V', 'Segmento VI',
         'Tipificación',
         'Categoría (N1)', 'N2', 'N3', 'N4', 'N5', 'N6', 'Nivel Final',
-        'Cuál Otro Delito', 'Observación',
-        'Se comunica URI', 'Ciudad/Municipio URI', 'Consulta Jurídica',
+        'Observación',
         'Usuario'
     ]
     for col, header in enumerate(headers, 1):
@@ -409,12 +444,6 @@ def exportar_excel(request):
         correo_contacto = ev.contacto_correo or ''
         telf_contacto   = ev.contacto_telefono or ''
         telf_inconser   = ev.contacto_telefono_inconcer or ''
-
-        # Flags legibles
-        se_comunica_uri   = 'SÍ' if ev.se_comunica_uri is True else 'NO' if ev.se_comunica_uri is False else 'N/A'
-        consulta_juridica = 'SÍ' if ev.consulta_juridica is True else 'NO' if ev.consulta_juridica is False else 'N/A'
-
-        # Reconstruir nombres por nivel (hasta 6)
         n1 = n2 = n3 = n4 = n5 = n6 = ''
         nivel_final = 'Sin categoría'
         if ev.categoria:
@@ -429,7 +458,6 @@ def exportar_excel(request):
             n4 = niveles.get(4, '')
             n5 = niveles.get(5, '')
             n6 = niveles.get(6, '')
-            # Determinar el último nivel presente
             for k in (6, 5, 4, 3, 2, 1):
                 if niveles.get(k):
                     nivel_final = f"Nivel {k}"
@@ -461,17 +489,12 @@ def exportar_excel(request):
             ev.tipificacion.nombre if ev.tipificacion else '',
 
             n1, n2, n3, n4, n5, n6, nivel_final,
-            ev.cual_otro_delito or '',
             ev.observacion,
-            se_comunica_uri,
-            ev.ciudad_municipio_uri or '',
-            consulta_juridica,
             ev.user.username
         ]
         for col, value in enumerate(data, 1):
             ws.cell(row=row_idx, column=col, value=xl_safe(value))
 
-    # Auto-anchos
     col_widths = [len(h) + 2 for h in headers]
     for r in ws.iter_rows(min_row=2, max_row=ws.max_row, max_col=len(headers)):
         for i, cell in enumerate(r):
@@ -497,3 +520,62 @@ def exportar_excel(request):
     )
     resp['Content-Disposition'] = 'attachment; filename="reportes_tipificaciones.xlsx"'
     return resp
+
+
+def encuesta_publica(request, token):
+    encuesta = get_object_or_404(
+        Encuesta.objects.select_related("evaluacion"),
+        token=token
+    )
+
+    ya_respondida = encuesta.respuestas.exists()
+    if encuesta.expirada:
+        return render(request, "encuestas/expirada.html", {"encuesta": encuesta})
+    if ya_respondida and request.method == "GET":
+        return render(request, "encuestas/completada.html", {"encuesta": encuesta})
+
+    preguntas = PreguntaEncuesta.objects.all().order_by("orden")
+    FormClass = build_encuesta_form(preguntas)
+
+    initial = {}
+    if ya_respondida:
+        for r in encuesta.respuestas.select_related("pregunta"):
+            initial[f"q_{r.pregunta_id}"] = r.valor
+
+    if request.method == "POST":
+        form = FormClass(request.POST)
+        if form.is_valid():
+            with transaction.atomic():
+                for p in preguntas:
+                    valor = form.cleaned_data[f"q_{p.id}"]
+                    RespuestaEncuesta.objects.update_or_create(
+                        encuesta=encuesta, pregunta=p,
+                        defaults={"valor": valor}
+                    )
+                try:
+                    primera = preguntas.first()
+                    if primera and primera.tipo == "escala":
+                        encuesta.satisfaccionServicioRecibido = int(
+                            form.cleaned_data[f"q_{primera.id}"]
+                        )
+                        encuesta.save(update_fields=["satisfaccionServicioRecibido"])
+                except Exception:
+                    pass
+
+            gracias_url = reverse("encuesta_gracias")
+            return redirect(gracias_url)
+    else:
+        form = FormClass(initial=initial)
+
+    return render(
+        request,
+        "encuestas/encuesta_publica.html",
+        {
+            "encuesta": encuesta,
+            "form": form,
+            "preguntas": preguntas,
+        },
+    )
+
+def encuesta_gracias(request):
+    return render(request, "encuestas/gracias.html")
