@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 
+
 class TipoIdentificacion(models.Model):
     nombre = models.CharField(max_length=100)
 
@@ -24,7 +25,7 @@ class Pais(models.Model):
 
     def __str__(self):
         return self.nombre
-    
+
 
 class Ciudadano(models.Model):
     tipo_identificacion = models.ForeignKey(TipoIdentificacion, on_delete=models.CASCADE)
@@ -43,7 +44,7 @@ class Ciudadano(models.Model):
 
     def __str__(self):
         return f"{self.nombre} ({self.tipo_identificacion} {self.numero_identificacion})"
-    
+
 
 class TipoCanal(models.Model):
     nombre = models.CharField(max_length=100, unique=True)
@@ -56,10 +57,13 @@ class TipoCanal(models.Model):
     def __str__(self):
         return self.nombre
 
+
+# ===================== SEGMENTOS 1 → 6 =====================
+
 class Segmento(models.Model):
     nombre = models.CharField(max_length=200)
-    tipo_canal = models.ForeignKey(TipoCanal, on_delete=models.CASCADE, null=True, blank=True)  # Nueva relación
-    tiene_segmento_ii = models.BooleanField(default=False)  # Indica si necesita Segmento II
+    tipo_canal = models.ForeignKey(TipoCanal, on_delete=models.CASCADE, null=True, blank=True)
+    tiene_segmento_ii = models.BooleanField(default=False)
     activo = models.BooleanField(default=True)
 
     class Meta:
@@ -68,10 +72,11 @@ class Segmento(models.Model):
         ordering = ['tipo_canal', 'nombre']
 
     def __str__(self):
-        return f"{self.tipo_canal.nombre} - {self.nombre}"
-    
+        tc = self.tipo_canal.nombre if self.tipo_canal else "Sin canal"
+        return f"{tc} - {self.nombre}"
 
-class SegmentoII(models.Model):  # Nuevo modelo
+
+class SegmentoII(models.Model):
     nombre = models.CharField(max_length=200)
     segmento = models.ForeignKey(Segmento, on_delete=models.CASCADE)
 
@@ -83,7 +88,8 @@ class SegmentoII(models.Model):  # Nuevo modelo
     def __str__(self):
         return f"{self.segmento.nombre} - {self.nombre}"
 
-class SegmentoIII(models.Model):  # NUEVO MODELO AGREGADO
+
+class SegmentoIII(models.Model):
     nombre = models.CharField(max_length=200)
     segmento_ii = models.ForeignKey(SegmentoII, on_delete=models.CASCADE)
 
@@ -94,6 +100,57 @@ class SegmentoIII(models.Model):  # NUEVO MODELO AGREGADO
 
     def __str__(self):
         return f"{self.segmento_ii.segmento.nombre} - {self.segmento_ii.nombre} - {self.nombre}"
+
+
+class SegmentoIV(models.Model):
+    nombre = models.CharField(max_length=200)
+    segmento_iii = models.ForeignKey(SegmentoIII, on_delete=models.CASCADE)
+
+    class Meta:
+        verbose_name = "Segmento IV"
+        verbose_name_plural = "Segmentos IV"
+        ordering = ['segmento_iii', 'nombre']
+
+    def __str__(self):
+        s2 = self.segmento_iii.segmento_ii
+        s1 = s2.segmento
+        return f"{s1.nombre} - {s2.nombre} - {self.segmento_iii.nombre} - {self.nombre}"
+
+
+class SegmentoV(models.Model):
+    nombre = models.CharField(max_length=200)
+    segmento_iv = models.ForeignKey(SegmentoIV, on_delete=models.CASCADE)
+
+    class Meta:
+        verbose_name = "Segmento V"
+        verbose_name_plural = "Segmentos V"
+        ordering = ['segmento_iv', 'nombre']
+
+    def __str__(self):
+        s3 = self.segmento_iv.segmento_iii
+        s2 = s3.segmento_ii
+        s1 = s2.segmento
+        return f"{s1.nombre} - {s2.nombre} - {s3.nombre} - {self.segmento_iv.nombre} - {self.nombre}"
+
+
+class SegmentoVI(models.Model):
+    nombre = models.CharField(max_length=200)
+    segmento_v = models.ForeignKey(SegmentoV, on_delete=models.CASCADE)
+
+    class Meta:
+        verbose_name = "Segmento VI"
+        verbose_name_plural = "Segmentos VI"
+        ordering = ['segmento_v', 'nombre']
+
+    def __str__(self):
+        s4 = self.segmento_v.segmento_iv
+        s3 = s4.segmento_iii
+        s2 = s3.segmento_ii
+        s1 = s2.segmento
+        return f"{s1.nombre} - {s2.nombre} - {s3.nombre} - {s4.nombre} - {self.segmento_v.nombre} - {self.nombre}"
+
+
+# ===================== TIPIFICACIÓN / CATEGORÍAS (1 → 6) =====================
 
 class Tipificacion(models.Model):
     nombre = models.CharField(max_length=200)
@@ -106,7 +163,12 @@ class Tipificacion(models.Model):
     def __str__(self):
         return self.nombre
 
+
 class Categoria(models.Model):
+    """
+    Árbol de categorías hasta nivel 6:
+    nivel=1 (raíz), 2, 3, 4, 5, 6 (terminal)
+    """
     nombre = models.CharField(max_length=200)
     nivel = models.IntegerField(default=1, db_index=True)
     tipificacion = models.ForeignKey(Tipificacion, null=True, blank=True, on_delete=models.CASCADE)
@@ -120,47 +182,50 @@ class Categoria(models.Model):
     def __str__(self):
         if self.tipificacion:
             return f"{self.nombre} - {self.tipificacion.nombre}"
-        else:
-            return f"{self.nombre} - {self.categoria_padre.nombre if self.categoria_padre else 'Sin padre'}"
+        return f"{self.nombre} - {self.categoria_padre.nombre if self.categoria_padre else 'Sin padre'}"
 
 
-# Actualizar el modelo Evaluacion en gestion/models.py
+# ===================== EVALUACIÓN =====================
 
 class Evaluacion(models.Model):
     conversacion_id = models.CharField(max_length=250)
     observacion = models.TextField()
     ciudadano = models.ForeignKey(Ciudadano, on_delete=models.CASCADE)
-    
-    # Campos antiguos (mantener temporalmente)
-    categoria = models.ForeignKey(Categoria, on_delete=models.CASCADE)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    fecha = models.DateTimeField(auto_now=True)
-    
-    # Nuevos campos (nullable para migración)
+
+    # Tipificación (árbol de categorías hasta nivel 6)
+    tipificacion = models.ForeignKey(Tipificacion, on_delete=models.CASCADE, null=True, blank=True)
+    categoria = models.ForeignKey(Categoria, on_delete=models.CASCADE, null=True, blank=True)
+
+    # Canal / Segmentos (hasta VI)
     tipo_canal = models.ForeignKey(TipoCanal, on_delete=models.CASCADE, null=True, blank=True)
     segmento = models.ForeignKey(Segmento, on_delete=models.CASCADE, null=True, blank=True)
     segmento_ii = models.ForeignKey(SegmentoII, on_delete=models.CASCADE, null=True, blank=True)
-    segmento_iii = models.ForeignKey(SegmentoIII, on_delete=models.CASCADE, null=True, blank=True)  # NUEVO CAMPO
-    tipificacion = models.ForeignKey(Tipificacion, on_delete=models.CASCADE, null=True, blank=True)
-    
+    segmento_iii = models.ForeignKey(SegmentoIII, on_delete=models.CASCADE, null=True, blank=True)
+    segmento_iv = models.ForeignKey(SegmentoIV, on_delete=models.CASCADE, null=True, blank=True)
+    segmento_v  = models.ForeignKey(SegmentoV,  on_delete=models.CASCADE, null=True, blank=True)
+    segmento_vi = models.ForeignKey(SegmentoVI, on_delete=models.CASCADE, null=True, blank=True)
+
+    # Metadatos
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    fecha = models.DateTimeField(auto_now=True)
+
     # Campo especial para "OTROS DELITOS"
-    cual_otro_delito = models.CharField(max_length=500, blank=True, null=True, 
-                                      verbose_name="¿Cuál otro delito?",
-                                      help_text="Solo se llena cuando se selecciona 'OTROS DELITOS'")
-    
-    # Campos luego de tipificación
+    cual_otro_delito = models.CharField(
+        max_length=500, blank=True, null=True,
+        verbose_name="¿Cuál otro delito?",
+        help_text="Solo se llena cuando se selecciona 'OTROS DELITOS'"
+    )
+
+    # Preguntas adicionales (URI / consulta jurídica)
     se_comunica_uri = models.BooleanField(null=True, blank=True, verbose_name="Se comunica de una URI")
     ciudad_municipio_uri = models.CharField(max_length=200, blank=True, verbose_name="Ciudad/Municipio URI")
-    
     consulta_juridica = models.BooleanField(null=True, blank=True, verbose_name="Consulta jurídica")
-    abogado = models.ForeignKey('Abogado', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Abogado asignado")
 
+    # Contacto si es anónimo
     es_anonimo = models.BooleanField(default=False, db_index=True)
     contacto_correo   = models.EmailField("Correo de contacto", max_length=254, blank=True, null=True, db_index=True)
     contacto_telefono = models.CharField("Teléfono de contacto", max_length=20,  blank=True, null=True, db_index=True)
     contacto_telefono_inconcer = models.CharField("Teléfono Inconcer (contacto)", max_length=20, blank=True, null=True, db_index=True)
-
-
 
     class Meta:
         verbose_name = "Evaluación"
@@ -169,105 +234,41 @@ class Evaluacion(models.Model):
 
     def __str__(self):
         return f"{self.ciudadano.nombre} - {self.fecha}"
-    
-# NUEVO MODELO PARA ABOGADOS
-class Abogado(models.Model):
-    nombre = models.CharField(max_length=255)
-    email = models.EmailField(blank=True)
-    telefono = models.CharField(max_length=20, blank=True)
-    especialidad = models.CharField(max_length=200, blank=True)
-    activo = models.BooleanField(default=True)
-    fecha_creacion = models.DateTimeField(auto_now_add=True)
-    
+
+
+# ===================== ENCUESTA (lógica anterior conservada) =====================
+
+class Encuesta(models.Model):
+    """
+    Encuesta asociada 1:N a Evaluacion. Token único y expiración.
+    """
+    evaluacion = models.ForeignKey(Evaluacion, on_delete=models.CASCADE, related_name='encuestas')
+
+    dominioPersonaAtendio = models.IntegerField(null=True, blank=True)
+    satisfaccionServicioRecibido = models.IntegerField(null=True, blank=True)
+    tiempoEsperaServicio = models.IntegerField(null=True, blank=True)
+    recomendacionCanalAtencion = models.IntegerField(null=True, blank=True)
+    solucionSolicitud = models.BooleanField(null=True, blank=True)
+
+    idInteraccion = models.CharField(max_length=150)
+    seleccionarCanal = models.CharField(max_length=150, null=True, blank=True)
+    nombreAgente = models.CharField(max_length=150)
+
+    token = models.CharField(max_length=50, unique=True, db_index=True)
+    fechaExpiracionLink = models.DateTimeField(db_index=True)
+    fecha_creacion = models.DateTimeField(null=True, db_index=True)
+
     class Meta:
-        verbose_name = "Abogado"
-        verbose_name_plural = "Abogados"
-        ordering = ['nombre']
+        verbose_name = "Encuesta"
+        verbose_name_plural = "Encuestas"
+        ordering = ['-fecha_creacion']
 
     def __str__(self):
-        return f"{self.nombre}"
+        return f"Encuesta {self.token} (Eval {self.evaluacion_id})"
 
-class Delito(models.Model):
-    nombre = models.CharField(max_length=255, unique=True)
-    codigo = models.CharField(max_length=50, blank=True, verbose_name="Código del delito")
-    descripcion = models.TextField(blank=True, verbose_name="Descripción del delito")
-    activo = models.BooleanField(default=True)
-    fecha_creacion = models.DateTimeField(auto_now_add=True)
-    
-    class Meta:
-        verbose_name = "Delito"
-        verbose_name_plural = "Delitos"
-        ordering = ['nombre']
-
-    def __str__(self):
-        return f"{self.codigo} - {self.nombre}" if self.codigo else self.nombre
-
-
-# Actualizar el modelo CasoAbogado agregando los nuevos campos
-class CasoAbogado(models.Model):
-    ESTADO_CHOICES = [
-        ('PENDIENTE', 'Pendiente'),
-        ('EN_REVISION', 'En Revisión'),
-        ('COMPLETADO', 'Completado'),
-        ('CERRADO', 'Cerrado'),
-    ]
-    
-    PRIORIDAD_CHOICES = [
-        ('ALTA', 'Alta'),
-        ('MEDIA', 'Media'),
-        ('BAJA', 'Baja'),
-    ]
-
-    evaluacion = models.OneToOneField(Evaluacion, on_delete=models.CASCADE, related_name='caso_abogado')
-    abogado = models.ForeignKey(Abogado, on_delete=models.CASCADE, related_name='casos_asignados')
-    fecha_asignacion = models.DateTimeField(auto_now_add=True)
-    fecha_revision = models.DateTimeField(null=True, blank=True)
-    fecha_completado = models.DateTimeField(null=True, blank=True)
-    
-    # NUEVO CAMPO AGREGADO
-    fecha_tipificacion_agente = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de tipificación del abogado")
-    
-    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='PENDIENTE')
-    prioridad = models.CharField(max_length=10, choices=PRIORIDAD_CHOICES, default='MEDIA')
-    
-    # Campos para que el abogado complete
-    observaciones_abogado = models.TextField(blank=True, verbose_name="Observaciones del abogado")
-    
-    # Campos jurídicos activos
-    delito = models.ForeignKey(Delito, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Delito identificado")
-    interaccion_directa_usuario = models.BooleanField(null=True, blank=True, verbose_name="Interacción directa con el usuario")
-    habeas_corpus = models.BooleanField(null=True, blank=True, verbose_name="Habeas Corpus")
-    tutela = models.BooleanField(null=True, blank=True, verbose_name="Tutela")
-    
-    # Campo de seguimiento
-    tiempo_respuesta_horas = models.IntegerField(null=True, blank=True, verbose_name="Tiempo de respuesta (horas)")
-    
-    class Meta:
-        verbose_name = "Caso de Abogado"
-        verbose_name_plural = "Casos de Abogados"
-        ordering = ['-fecha_asignacion']
-
-    def __str__(self):
-        return f"Caso #{self.id} - {self.evaluacion.ciudadano.nombre} - {self.abogado.nombre}"
-    
-    def save(self, *args, **kwargs):
-        # Calcular tiempo de respuesta automáticamente
-        if self.estado == 'EN_REVISION' and not self.fecha_revision:
-            self.fecha_revision = timezone.now()
-        elif self.estado == 'COMPLETADO' and not self.fecha_completado:
-            self.fecha_completado = timezone.now()
-            
-        # NUEVA LÓGICA: Registrar fecha de tipificación del abogado
-        # Se registra la primera vez que el abogado hace algún cambio
-        if not self.fecha_tipificacion_agente:
-            # Verificar si es una actualización (no creación) y tiene datos del abogado
-            if self.pk and (self.observaciones_abogado or self.delito or 
-                           self.interaccion_directa_usuario is not None or 
-                           self.habeas_corpus is not None or 
-                           self.tutela is not None):
-                self.fecha_tipificacion_agente = timezone.now()
-        
-        super().save(*args, **kwargs)       
+    @property
+    def expirada(self):
+        return timezone.now() > self.fechaExpiracionLink
 
 
 class RegistroError(models.Model):

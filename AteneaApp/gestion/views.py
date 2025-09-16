@@ -10,13 +10,14 @@ from django.utils.timezone import now, make_aware, localtime
 from usuarios.views import ValidarRolUsuario, en_grupo
 from usuarios.enums import Roles
 from .models import *
-from .utils import RegistrarError, get_ciudadano_anonimo  
+from .utils import RegistrarError, get_ciudadano_anonimo
 from io import BytesIO
 from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 import openpyxl
 from openpyxl.utils import get_column_letter
 import inspect
+
 
 def index(request):
     if request.user.is_authenticated:
@@ -26,9 +27,6 @@ def index(request):
             return redirect('dashboard_supervisor')
         elif ValidarRolUsuario(request, Roles.AGENTE.value):
             return redirect('dashboard_agente')
-        elif ValidarRolUsuario(request, Roles.ABOGADO.value):  # NUEVA REDIRECCIÓN
-            return redirect('dashboard_abogado')
-        
         messages.warning(request, "Usted no esta autorizado.")
         return redirect('logout')
     else:
@@ -70,49 +68,39 @@ def crear_evaluacion(request):
                             ciudad=request.POST.get('ciudad', '')
                         )
 
-                # PROCESAMIENTO DE CATEGORÍAS 
+                # === CATEGORÍAS: tomar el nivel más profundo disponible (1→6) ===
                 categoria_final_id = None
-                if request.POST.get('subcategoria_iii'):
-                    categoria_final_id = request.POST.get('subcategoria_iii')
-                elif request.POST.get('subcategoria_ii'):
-                    categoria_final_id = request.POST.get('subcategoria_ii')
-                elif request.POST.get('subcategoria'):
-                    categoria_final_id = request.POST.get('subcategoria')
-                elif request.POST.get('categoria'):
-                    categoria_final_id = request.POST.get('categoria')
+                for key in ('subcategoria_v', 'subcategoria_iv', 'subcategoria_iii', 'subcategoria_ii', 'subcategoria', 'categoria'):
+                    val = request.POST.get(key)
+                    if val:
+                        categoria_final_id = val
+                        break
                 if categoria_final_id == "0":
                     categoria_final_id = None
 
-
-                se_comunica_uri = request.POST.get('se_comunica_uri')
-                se_comunica_uri_bool = True if se_comunica_uri == '1' else False if se_comunica_uri == '0' else None
-                ciudad_municipio_uri = request.POST.get('ciudad_municipio_uri', '') if se_comunica_uri_bool else ''
-
-                consulta_juridica = request.POST.get('consulta_juridica')
-                consulta_juridica_bool = True if consulta_juridica == '1' else False if consulta_juridica == '0' else None
-                abogado_id = request.POST.get('abogado') or None if consulta_juridica_bool else None
-
+                # Tel Inconcer (form puede traer inconser/inconcer)
                 tel_inconser = request.POST.get('telefono_inconser') or request.POST.get('telefono_inconcer') or ''
+
                 evaluacion = Evaluacion.objects.create(
                     conversacion_id=request.POST['conversacion_id'],
                     observacion=request.POST['observacion'],
                     ciudadano=ciudadano,
                     user=request.user,
 
+                    # Canal / Segmentos 1→6
                     tipo_canal_id=request.POST.get('tipo_canal'),
                     segmento_id=request.POST.get('segmento'),
                     segmento_ii_id=request.POST.get('segmento_ii') or None,
                     segmento_iii_id=request.POST.get('segmento_iii') or None,
+                    segmento_iv_id=request.POST.get('segmento_iv') or None,
+                    segmento_v_id=request.POST.get('segmento_v') or None,
+                    segmento_vi_id=request.POST.get('segmento_vi') or None,
+
+                    # Tipificación y categoría final (1→6)
                     tipificacion_id=request.POST.get('tipificacion'),
                     categoria_id=categoria_final_id,
 
-                    cual_otro_delito=request.POST.get('cual_otro_delito', ''),
-                    se_comunica_uri=se_comunica_uri_bool,
-                    ciudad_municipio_uri=ciudad_municipio_uri,
-                    consulta_juridica=consulta_juridica_bool,
-                    abogado_id=abogado_id,
-
-                    # Guardar contactos SOLO si es anónimo 
+                    # Contactos para anónimo
                     es_anonimo=es_anonimo,
                     contacto_correo   = (request.POST.get('correo', '')   if es_anonimo else None),
                     contacto_telefono = (request.POST.get('telefono', '') if es_anonimo else None),
@@ -124,35 +112,22 @@ def crear_evaluacion(request):
                     'segmento': request.POST.get('segmento'),
                     'segmento_ii': request.POST.get('segmento_ii'),
                     'segmento_iii': request.POST.get('segmento_iii'),
+                    'segmento_iv': request.POST.get('segmento_iv'),
+                    'segmento_v': request.POST.get('segmento_v'),
+                    'segmento_vi': request.POST.get('segmento_vi'),
                     'tipificacion': request.POST.get('tipificacion'),
                     'categoria': request.POST.get('categoria'),
                     'subcategoria': request.POST.get('subcategoria'),
                     'subcategoria_ii': request.POST.get('subcategoria_ii'),
                     'subcategoria_iii': request.POST.get('subcategoria_iii'),
+                    'subcategoria_iv': request.POST.get('subcategoria_iv'),
+                    'subcategoria_v': request.POST.get('subcategoria_v'),
                     'categoria_final_id': categoria_final_id,
-                    'es_anonimo': es_anonimo,
+                    'es_anonimo': request.POST.get('es_anonimo'),
                     'telefono_inconcer': tel_inconser,
                 }
                 print(f"DEBUG - Crear evaluación: {debug_info}")
-
-                if consulta_juridica_bool and abogado_id:
-                    try:
-                        abogado = Abogado.objects.get(id=abogado_id)
-                        prioridad = determinar_prioridad_caso(evaluacion)
-                        CasoAbogado.objects.create(
-                            evaluacion=evaluacion,
-                            abogado=abogado,
-                            prioridad=prioridad,
-                            estado='PENDIENTE'
-                        )
-                        messages.success(
-                            request,
-                            f"Evaluación guardada correctamente. Caso asignado automáticamente al abogado {abogado.nombre}."
-                        )
-                    except Abogado.DoesNotExist:
-                        messages.warning(request, "Evaluación guardada, pero el abogado seleccionado no existe.")
-                else:
-                    messages.success(request, "Evaluación guardada correctamente.")
+                messages.success(request, "Evaluación guardada correctamente.")
 
         except Exception as e:
             RegistrarError(inspect.currentframe().f_code.co_name, str(e), request)
@@ -163,7 +138,6 @@ def crear_evaluacion(request):
     tiposIdentificacion = TipoIdentificacion.objects.all()
     tipos_canal = TipoCanal.objects.all()
     paises = Pais.objects.all()
-    abogados = Abogado.objects.filter(activo=True).order_by('nombre')
 
     if not tiposIdentificacion or not tipos_canal:
         messages.warning(request, "En este momento no es posible generar una tipificación. Por favor, contacte a soporte.")
@@ -173,63 +147,12 @@ def crear_evaluacion(request):
         'tiposIdentificacion': tiposIdentificacion,
         'tipos_canal': tipos_canal,
         'paises': paises,
-        'abogados': abogados,
         'is_supervisor': (
             ValidarRolUsuario(request, Roles.SUPERVISOR.value)
             or ValidarRolUsuario(request, Roles.ADMINISTRADOR.value)
         ),
         'numero_anonimo': '9999999',
     })
-
-# ==================== FUNCIÓN AUXILIAR ACTUALIZADA ====================
-
-def determinar_prioridad_caso(evaluacion):
-    """
-    Determina la prioridad del caso basado en la tipificación o categoría
-    Actualizado para manejar Sub Categorías II y III
-    """
-    try:
-        # Obtener el nombre de la categoría (cualquier nivel)
-        categoria_nombre = ""
-        tipificacion_nombre = ""
-        
-        if evaluacion.categoria:
-            categoria_nombre = evaluacion.categoria.nombre.upper()
-            # Intentar obtener la tipificación desde la categoría o directamente
-            if hasattr(evaluacion.categoria, 'tipificacion') and evaluacion.categoria.tipificacion:
-                tipificacion_nombre = evaluacion.categoria.tipificacion.nombre.upper()
-            elif evaluacion.tipificacion:
-                tipificacion_nombre = evaluacion.tipificacion.nombre.upper()
-        elif evaluacion.tipificacion:
-            tipificacion_nombre = evaluacion.tipificacion.nombre.upper()
-        
-        # Casos de alta prioridad
-        palabras_alta_prioridad = [
-            'VIOLENCIA', 'SEXUAL', 'INTRAFAMILIAR', 'MENOR', 'INFANTIL', 
-            'HOMICIDIO', 'SECUESTRO', 'EXTORSIÓN', 'AMENAZA', 'URGENTE',
-            'CRISIS', 'NNA'  # Agregadas para Sub Categorías II/III
-        ]
-        
-        # Casos de baja prioridad  
-        palabras_baja_prioridad = [
-            'CONSULTA', 'INFORMACIÓN', 'ORIENTACIÓN', 'DOCUMENTOS', 'COPIA'
-        ]
-        
-        texto_completo = f"{categoria_nombre} {tipificacion_nombre}"
-        
-        for palabra in palabras_alta_prioridad:
-            if palabra in texto_completo:
-                return 'ALTA'
-                
-        for palabra in palabras_baja_prioridad:
-            if palabra in texto_completo:
-                return 'BAJA'
-                
-        return 'MEDIA'  # Prioridad por defecto
-        
-    except Exception as e:
-        print(f"Error determinando prioridad: {e}")
-        return 'MEDIA'  # En caso de error, asignar prioridad media
 
 
 @login_required
@@ -239,7 +162,6 @@ def buscar_tipificacion(request):
     Busca Evaluacion(es) por número de identificación del ciudadano,
     correo/teléfono de contacto guardados en la Evaluación (anónimo),
     y correo/teléfono del Ciudadano (no anónimo / legacy).
-    Paginadas de a 10. Devuelve todos los campos relacionados.
     """
     query = (request.GET.get('q') or '').strip()
     evaluaciones = Evaluacion.objects.none()
@@ -257,7 +179,10 @@ def buscar_tipificacion(request):
                 'tipo_canal',
                 'segmento',
                 'segmento_ii',
-                'segmento_iii',  
+                'segmento_iii',
+                'segmento_iv',
+                'segmento_v',
+                'segmento_vi',
                 'tipificacion'
             )
             .filter(
@@ -287,10 +212,7 @@ def buscar_tipificacion(request):
 def get_quick_range(quick: str):
     """
     quick ∈ {'hoy', 'ayer', '7d'}
-    Retorna (start, end, etiqueta) como timezone-aware.
-    - 'hoy'   : 00:00 de hoy → ahora
-    - 'ayer'  : 00:00 de ayer → 00:00 de hoy (usaremos lt end)
-    - '7d'    : ahora - 7 días → ahora
+    Retorna (start, end, etiqueta) timezone-aware.
     """
     tz_now = now()
     if quick == 'hoy':
@@ -300,7 +222,7 @@ def get_quick_range(quick: str):
     if quick == 'ayer':
         ayer  = tz_now - timedelta(days=1)
         start = ayer.replace(hour=0, minute=0, second=0, microsecond=0)
-        end   = start + timedelta(days=1) 
+        end   = start + timedelta(days=1)
         return start, end, 'ayer'
     if quick == '7d':
         start = tz_now - timedelta(days=7)
@@ -309,11 +231,10 @@ def get_quick_range(quick: str):
     return None, None, None
 
 
-
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value, Roles.SUPERVISOR.value, Roles.AGENTE.value])
 def reportes_view(request):
-    quick = request.GET.get('quick')  
+    quick = request.GET.get('quick')
     fecha_inicio = request.GET.get('fecha_inicio')
     fecha_fin = request.GET.get('fecha_fin')
     usuario_id = request.GET.get('usuario')
@@ -330,6 +251,10 @@ def reportes_view(request):
             'tipo_canal',
             'segmento',
             'segmento_ii',
+            'segmento_iii',
+            'segmento_iv',
+            'segmento_v',
+            'segmento_vi',
             'tipificacion'
         )
         .order_by('-fecha')
@@ -361,7 +286,7 @@ def reportes_view(request):
 
     usuarios = User.objects.filter(groups__name__in=['Agente', 'Supervisor', 'Administrador']).distinct()
     canales = TipoCanal.objects.all()
-    
+
     base = Evaluacion.objects.all()
     if usuario_id and str(usuario_id).isdigit():
         base = base.filter(user_id=int(usuario_id))
@@ -394,7 +319,6 @@ def reportes_view(request):
     })
 
 
-
 def xl_safe(v):
     if v is None:
         return ''
@@ -423,9 +347,11 @@ def exportar_excel(request):
             'tipo_canal',
             'segmento',
             'segmento_ii',
+            'segmento_iii',
+            'segmento_iv',
+            'segmento_v',
+            'segmento_vi',
             'tipificacion',
-            'abogado',
-            'caso_abogado', 'caso_abogado__delito'
         )
         .order_by('-fecha')
     )
@@ -462,15 +388,15 @@ def exportar_excel(request):
     headers = [
         'Fecha', 'Tipo Documento', 'Número ID', 'Nombre',
         'Correo', 'Teléfono',
-        'Correo contacto', 'Teléfono contacto', 'Teléfono Inconcer',  
+        'Correo contacto', 'Teléfono contacto', 'Teléfono Inconcer',
         'País', 'Ciudad', 'Dirección',
-        'ID Conversación', 'Tipo Canal', 'Segmento', 'Segmento II',
-        'Tipificación', 'Categoría', 'Categoría Padre',
-        'Sub Categoría II', 'Sub Categoría III', 'Nivel Final',
-        'Cuál Otro Delito', 'Observación', 'Se comunica URI', 'Ciudad/Municipio URI', 'Consulta Jurídica',
-        'Delito Código', 'Delito Nombre', 'Interacción Directa', 'Habeas Corpus',
-        'Tutela', 'Observaciones Abogado', 'Fecha Tipificación Abogado', 'Estado de Caso',
-        'Abogado', 'Usuario'
+        'ID Conversación',
+        'Tipo Canal', 'Segmento I', 'Segmento II', 'Segmento III', 'Segmento IV', 'Segmento V', 'Segmento VI',
+        'Tipificación',
+        'Categoría (N1)', 'N2', 'N3', 'N4', 'N5', 'N6', 'Nivel Final',
+        'Cuál Otro Delito', 'Observación',
+        'Se comunica URI', 'Ciudad/Municipio URI', 'Consulta Jurídica',
+        'Usuario'
     ]
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
@@ -478,81 +404,37 @@ def exportar_excel(request):
     for row_idx, ev in enumerate(qs.iterator(), start=2):
         ciu = ev.ciudadano
 
-        # === Fallback: primero Evaluación; si no, Ciudadano ===
         correo_base = ciu.correo or ''
         telf_base   = ciu.telefono or ''
-
         correo_contacto = ev.contacto_correo or ''
         telf_contacto   = ev.contacto_telefono or ''
-        telf_inconser   = ev.contacto_telefono_inconcer or ''  # tal cual tu modelo
+        telf_inconser   = ev.contacto_telefono_inconcer or ''
 
         # Flags legibles
         se_comunica_uri   = 'SÍ' if ev.se_comunica_uri is True else 'NO' if ev.se_comunica_uri is False else 'N/A'
         consulta_juridica = 'SÍ' if ev.consulta_juridica is True else 'NO' if ev.consulta_juridica is False else 'N/A'
-        abogado_nombre    = ev.abogado.nombre if ev.abogado else ''
 
-        caso_abogado = getattr(ev, 'caso_abogado', None)
-        delito_codigo = caso_abogado.delito.codigo if caso_abogado and caso_abogado.delito else ''
-        delito_nombre = caso_abogado.delito.nombre if caso_abogado and caso_abogado.delito else ''
-        interaccion_directa = 'SÍ' if caso_abogado and caso_abogado.interaccion_directa_usuario is True else 'NO' if caso_abogado and caso_abogado.interaccion_directa_usuario is False else 'N/A'
-        habeas_corpus = 'SÍ' if caso_abogado and caso_abogado.habeas_corpus is True else 'NO' if caso_abogado and caso_abogado.habeas_corpus is False else 'N/A'
-        tutela = 'SÍ' if caso_abogado and caso_abogado.tutela is True else 'NO' if caso_abogado and caso_abogado.tutela is False else 'N/A'
-        observaciones_abogado = caso_abogado.observaciones_abogado if caso_abogado else ''
-        fecha_tipificacion_abogado = ''
-        estado_caso = 'N/A'
-        if caso_abogado:
-            try:
-                fecha_tipificacion_abogado = (
-                    localtime(caso_abogado.fecha_tipificacion_agente).strftime('%Y-%m-%d %H:%M')
-                    if caso_abogado.fecha_tipificacion_agente else 'Sin tipificar'
-                )
-            except Exception:
-                fecha_tipificacion_abogado = 'Sin tipificar'
-            try:
-                estado_caso = caso_abogado.get_estado_display()
-            except Exception:
-                estado_caso = 'N/A'
-
-        # === Jerarquía de categorías (igual que tu lógica actual) ===
-        categoria_principal = ''
-        categoria_padre_nombre = ''
-        subcategoria_ii_nombre = ''
-        subcategoria_iii_nombre = ''
-        nivel_final = ''
+        # Reconstruir nombres por nivel (hasta 6)
+        n1 = n2 = n3 = n4 = n5 = n6 = ''
+        nivel_final = 'Sin categoría'
         if ev.categoria:
-            categoria_nivel = ev.categoria.nivel if hasattr(ev.categoria, 'nivel') else 1
-            if categoria_nivel == 1:
-                categoria_principal = ev.categoria.nombre
-                nivel_final = 'Categoría'
-            elif categoria_nivel == 2:
-                categoria_principal    = ev.categoria.categoria_padre.nombre if ev.categoria.categoria_padre else ''
-                categoria_padre_nombre = ev.categoria.nombre
-                nivel_final = 'Sub Categoría'
-            elif categoria_nivel == 3:
-                subcategoria_ii_nombre = ev.categoria.nombre
-                if ev.categoria.categoria_padre:
-                    categoria_padre_nombre = ev.categoria.categoria_padre.nombre
-                    categoria_principal    = ev.categoria.categoria_padre.categoria_padre.nombre if ev.categoria.categoria_padre.categoria_padre else ''
-                nivel_final = 'Sub Categoría II'
-            elif categoria_nivel == 4:
-                subcategoria_iii_nombre = ev.categoria.nombre
-                if ev.categoria.categoria_padre:
-                    subcategoria_ii_nombre = ev.categoria.categoria_padre.nombre
-                    if ev.categoria.categoria_padre.categoria_padre:
-                        categoria_padre_nombre = ev.categoria.categoria_padre.categoria_padre.nombre
-                        categoria_principal = (
-                            ev.categoria.categoria_padre.categoria_padre.categoria_padre.nombre
-                            if ev.categoria.categoria_padre.categoria_padre.categoria_padre else ''
-                        )
-                nivel_final = 'Sub Categoría III'
-            else:
-                categoria_principal = ev.categoria.nombre
-                nivel_final = f'Nivel {categoria_nivel}'
-        else:
-            categoria_principal = 'Sin categoría específica'
-            nivel_final = 'Sin categoría'
+            cur = ev.categoria
+            niveles = {}
+            while cur:
+                niveles[cur.nivel] = cur.nombre
+                cur = cur.categoria_padre
+            n1 = niveles.get(1, '')
+            n2 = niveles.get(2, '')
+            n3 = niveles.get(3, '')
+            n4 = niveles.get(4, '')
+            n5 = niveles.get(5, '')
+            n6 = niveles.get(6, '')
+            # Determinar el último nivel presente
+            for k in (6, 5, 4, 3, 2, 1):
+                if niveles.get(k):
+                    nivel_final = f"Nivel {k}"
+                    break
 
-        # === Ordena las columnas según headers (incluyendo las 3 nuevas) ===
         data = [
             localtime(ev.fecha).strftime('%Y-%m-%d %H:%M'),
             ciu.tipo_identificacion.nombre,
@@ -567,35 +449,29 @@ def exportar_excel(request):
             ciu.ciudad or '',
             ciu.direccion_residencia or '',
             ev.conversacion_id,
+
             ev.tipo_canal.nombre if ev.tipo_canal else '',
             ev.segmento.nombre if ev.segmento else '',
             ev.segmento_ii.nombre if ev.segmento_ii else '',
+            ev.segmento_iii.nombre if ev.segmento_iii else '',
+            ev.segmento_iv.nombre if ev.segmento_iv else '',
+            ev.segmento_v.nombre if ev.segmento_v else '',
+            ev.segmento_vi.nombre if ev.segmento_vi else '',
+
             ev.tipificacion.nombre if ev.tipificacion else '',
-            categoria_principal,
-            categoria_padre_nombre,
-            subcategoria_ii_nombre,
-            subcategoria_iii_nombre,
-            nivel_final,
+
+            n1, n2, n3, n4, n5, n6, nivel_final,
             ev.cual_otro_delito or '',
             ev.observacion,
             se_comunica_uri,
             ev.ciudad_municipio_uri or '',
             consulta_juridica,
-            delito_codigo,
-            delito_nombre,
-            interaccion_directa,
-            habeas_corpus,
-            tutela,
-            observaciones_abogado,
-            fecha_tipificacion_abogado,
-            estado_caso,
-            abogado_nombre,
             ev.user.username
         ]
         for col, value in enumerate(data, 1):
             ws.cell(row=row_idx, column=col, value=xl_safe(value))
 
-    # Auto-anchos (con límite)
+    # Auto-anchos
     col_widths = [len(h) + 2 for h in headers]
     for r in ws.iter_rows(min_row=2, max_row=ws.max_row, max_col=len(headers)):
         for i, cell in enumerate(r):
@@ -606,7 +482,6 @@ def exportar_excel(request):
     for i, w in enumerate(col_widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = max(12, w)
 
-    # Guardar y responder
     buffer = BytesIO()
     try:
         wb.save(buffer)
