@@ -1,0 +1,529 @@
+{% extends 'usuarios/base/base.html' %}
+{% block title %}Detalle del Caso #{{ caso.id }}{% endblock %}
+{% load static %}
+
+{% block content %}
+<div class="container py-5">
+    <!-- Header del Caso -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="fw-bold text-success mb-2">
+                <i class="bi bi-file-earmark-text-fill me-2"></i>Caso #{{ caso.id }}
+            </h1>
+            <p class="text-muted mb-0">{{ caso.evaluacion.ciudadano.nombre }}</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'mis_casos_abogado' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Volver a Casos
+            </a>
+            {% if caso.estado != 'CERRADO' %}
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#actualizarCasoModal">
+                    <i class="bi bi-pencil-square me-1"></i>Actualizar Caso
+                </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Información del Ciudadano -->
+        <div class="col-12 col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-person-circle me-2"></i>Información del Ciudadano
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <strong>Nombre Completo:</strong><br>
+                            <span class="text-muted">{{ caso.evaluacion.ciudadano.nombre }}</span>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Tipo de Documento:</strong><br>
+                            <span class="text-muted">{{ caso.evaluacion.ciudadano.tipo_identificacion.nombre }}</span>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Número de Documento:</strong><br>
+                            <span class="text-muted">{{ caso.evaluacion.ciudadano.numero_identificacion }}</span>
+                        </div>
+                        {% if caso.evaluacion.ciudadano.correo %}
+                        <div class="col-md-6">
+                            <strong>Correo:</strong><br>
+                            <span class="text-muted">{{ caso.evaluacion.ciudadano.correo }}</span>
+                        </div>
+                        {% endif %}
+                        {% if caso.evaluacion.ciudadano.telefono %}
+                        <div class="col-md-6">
+                            <strong>Teléfono:</strong><br>
+                            <span class="text-muted">{{ caso.evaluacion.ciudadano.telefono }}</span>
+                        </div>
+                        {% endif %}
+                        {% if caso.evaluacion.ciudadano.direccion_residencia %}
+                        <div class="col-12">
+                            <strong>Dirección:</strong><br>
+                            <span class="text-muted">{{ caso.evaluacion.ciudadano.direccion_residencia }}</span>
+                        </div>
+                        {% endif %}
+                        {% if caso.evaluacion.ciudadano.ciudad %}
+                        <div class="col-md-6">
+                            <strong>Ciudad:</strong><br>
+                            <span class="text-muted">{{ caso.evaluacion.ciudadano.ciudad }}</span>
+                        </div>
+                        {% endif %}
+                        {% if caso.evaluacion.ciudadano.pais %}
+                        <div class="col-md-6">
+                            <strong>País:</strong><br>
+                            <span class="text-muted">{{ caso.evaluacion.ciudadano.pais.nombre }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estado del Caso -->
+        <div class="col-12 col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clipboard-data me-2"></i>Estado del Caso
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <strong>Estado Actual:</strong><br>
+                            {% if caso.estado == 'PENDIENTE' %}
+                                <span class="badge bg-warning fs-6">
+                                    <i class="bi bi-clock me-1"></i>{{ caso.get_estado_display }}
+                                </span>
+                            {% elif caso.estado == 'EN_REVISION' %}
+                                <span class="badge bg-info fs-6">
+                                    <i class="bi bi-eye me-1"></i>{{ caso.get_estado_display }}
+                                </span>
+                            {% elif caso.estado == 'COMPLETADO' %}
+                                <span class="badge bg-success fs-6">
+                                    <i class="bi bi-check-circle me-1"></i>{{ caso.get_estado_display }}
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary fs-6">
+                                    <i class="bi bi-x-circle me-1"></i>{{ caso.get_estado_display }}
+                                </span>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Prioridad:</strong><br>
+                            {% if caso.prioridad == 'ALTA' %}
+                                <span class="badge bg-danger fs-6">
+                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ caso.get_prioridad_display }}
+                                </span>
+                            {% elif caso.prioridad == 'MEDIA' %}
+                                <span class="badge bg-warning fs-6">
+                                    <i class="bi bi-dash-circle-fill me-1"></i>{{ caso.get_prioridad_display }}
+                                </span>
+                            {% else %}
+                                <span class="badge bg-info fs-6">
+                                    <i class="bi bi-info-circle-fill me-1"></i>{{ caso.get_prioridad_display }}
+                                </span>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Fecha de Asignación:</strong><br>
+                            <span class="text-muted">{{ caso.fecha_asignacion|date:"d/m/Y H:i" }}</span>
+                        </div>
+                        {% if caso.fecha_revision %}
+                        <div class="col-md-6">
+                            <strong>Fecha de Revisión:</strong><br>
+                            <span class="text-muted">{{ caso.fecha_revision|date:"d/m/Y H:i" }}</span>
+                        </div>
+                        {% endif %}
+                        {% if caso.fecha_completado %}
+                        <div class="col-md-6">
+                            <strong>Fecha de Completado:</strong><br>
+                            <span class="text-muted">{{ caso.fecha_completado|date:"d/m/Y H:i" }}</span>
+                        </div>
+                        {% endif %}
+                        {% if caso.tiempo_respuesta_horas %}
+                        <div class="col-md-6">
+                            <strong>Tiempo de Respuesta:</strong><br>
+                            <span class="text-muted">{{ caso.tiempo_respuesta_horas }} horas</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tipificación -->
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-tags me-2"></i>Tipificación y Categorización
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <strong>Tipificación:</strong><br>
+                            <span class="text-muted">{{ caso.evaluacion.tipificacion.nombre }}</span>
+                        </div>
+                        {% if caso.evaluacion.categoria %}
+                        <div class="col-md-4">
+                            <strong>Categoría:</strong><br>
+                            <span class="text-muted">{{ caso.evaluacion.categoria.nombre }}</span>
+                        </div>
+                        {% endif %}
+                        {% if caso.evaluacion.categoria.categoria_padre %}
+                        <div class="col-md-4">
+                            <strong>Categoría Padre:</strong><br>
+                            <span class="text-muted">{{ caso.evaluacion.categoria.categoria_padre.nombre }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="col-md-6">
+                            <strong>ID Conversación:</strong><br>
+                            <span class="text-muted">{{ caso.evaluacion.conversacion_id }}</span>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Agente que Tipificó:</strong><br>
+                            <span class="text-muted">{{ caso.evaluacion.user.get_full_name|default:caso.evaluacion.user.username }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Información Adicional -->
+        {% if caso.evaluacion.se_comunica_uri or caso.evaluacion.consulta_juridica %}
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle me-2"></i>Información Adicional
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        {% if caso.evaluacion.se_comunica_uri is not None %}
+                        <div class="col-md-6">
+                            <strong>Se comunica de una URI:</strong><br>
+                            <span class="badge {% if caso.evaluacion.se_comunica_uri %}bg-success{% else %}bg-danger{% endif %}">
+                                {% if caso.evaluacion.se_comunica_uri %}SÍ{% else %}NO{% endif %}
+                            </span>
+                            {% if caso.evaluacion.ciudad_municipio_uri %}
+                                <br><small class="text-muted">Ciudad/Municipio: {{ caso.evaluacion.ciudad_municipio_uri }}</small>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        {% if caso.evaluacion.consulta_juridica is not None %}
+                        <div class="col-md-6">
+                            <strong>Consulta Jurídica:</strong><br>
+                            <span class="badge {% if caso.evaluacion.consulta_juridica %}bg-success{% else %}bg-danger{% endif %}">
+                                {% if caso.evaluacion.consulta_juridica %}SÍ{% else %}NO{% endif %}
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Análisis Jurídico del Abogado -->
+        {% if caso.delito or caso.interaccion_directa_usuario is not None or caso.habeas_corpus is not None or caso.tutela is not None %}
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-gradient-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-scale me-2"></i>Análisis Jurídico del Abogado
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4">
+                        <!-- Delito Identificado -->
+                        {% if caso.delito %}
+                        <div class="col-12">
+                            <div class="alert alert-danger border-start border-danger border-4 bg-danger bg-opacity-10">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-exclamation-triangle-fill text-danger me-3 fs-4"></i>
+                                    <div>
+                                        <strong class="text-danger">Delito Identificado:</strong>
+                                        <div class="fw-bold">{{ caso.delito.codigo }} - {{ caso.delito.nombre }}</div>
+                                        {% if caso.delito.descripcion %}
+                                            <small class="text-muted">{{ caso.delito.descripcion }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Evaluaciones Jurídicas -->
+                        <div class="col-12">
+                            <div class="row g-3">
+                                {% if caso.interaccion_directa_usuario is not None %}
+                                <div class="col-md-4">
+                                    <div class="card h-100 {% if caso.interaccion_directa_usuario %}border-success{% else %}border-secondary{% endif %}">
+                                        <div class="card-body text-center">
+                                            <i class="bi bi-person-check-fill fs-2 {% if caso.interaccion_directa_usuario %}text-success{% else %}text-secondary{% endif %} mb-2"></i>
+                                            <h6 class="card-title">Interacción Directa</h6>
+                                            <span class="badge {% if caso.interaccion_directa_usuario %}bg-success{% else %}bg-secondary{% endif %} fs-6">
+                                                {% if caso.interaccion_directa_usuario %}SÍ{% else %}NO{% endif %}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                {% if caso.habeas_corpus is not None %}
+                                <div class="col-md-4">
+                                    <div class="card h-100 {% if caso.habeas_corpus %}border-warning{% else %}border-secondary{% endif %}">
+                                        <div class="card-body text-center">
+                                            <i class="bi bi-shield-check fs-2 {% if caso.habeas_corpus %}text-warning{% else %}text-secondary{% endif %} mb-2"></i>
+                                            <h6 class="card-title">Habeas Corpus</h6>
+                                            <span class="badge {% if caso.habeas_corpus %}bg-warning text-dark{% else %}bg-secondary{% endif %} fs-6">
+                                                {% if caso.habeas_corpus %}SÍ{% else %}NO{% endif %}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                {% if caso.tutela is not None %}
+                                <div class="col-md-4">
+                                    <div class="card h-100 {% if caso.tutela %}border-info{% else %}border-secondary{% endif %}">
+                                        <div class="card-body text-center">
+                                            <i class="bi bi-shield-fill-check fs-2 {% if caso.tutela %}text-info{% else %}text-secondary{% endif %} mb-2"></i>
+                                            <h6 class="card-title">Tutela</h6>
+                                            <span class="badge {% if caso.tutela %}bg-info{% else %}bg-secondary{% endif %} fs-6">
+                                                {% if caso.tutela %}SÍ{% else %}NO{% endif %}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Observaciones del Caso -->
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-chat-text me-2"></i>Observaciones del Caso
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4">
+                        <!-- Observaciones Originales -->
+                        <div class="col-12">
+                            <div class="p-3 bg-light rounded">
+                                <strong class="text-primary">
+                                    <i class="bi bi-person-badge me-1"></i>Observaciones del Agente:
+                                </strong>
+                                <div class="mt-2">{{ caso.evaluacion.observacion|linebreaks }}</div>
+                            </div>
+                        </div>
+
+                        <!-- Observaciones del Abogado -->
+                        {% if caso.observaciones_abogado %}
+                        <div class="col-12">
+                            <div class="p-3 bg-success bg-opacity-10 rounded border border-success border-opacity-25">
+                                <strong class="text-success">
+                                    <i class="bi bi-briefcase me-1"></i>Observaciones del Abogado:
+                                </strong>
+                                <div class="mt-2">{{ caso.observaciones_abogado|linebreaks }}</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Actualizar Caso -->
+<div class="modal fade" id="actualizarCasoModal" tabindex="-1" aria-labelledby="actualizarCasoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title" id="actualizarCasoModalLabel">
+                        <i class="bi bi-pencil-square me-2"></i>Actualizar Caso #{{ caso.id }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Pestañas del Modal -->
+                    <ul class="nav nav-pills mb-3" id="modalTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="general-tab" data-bs-toggle="pill" data-bs-target="#general-content" type="button" role="tab">
+                                <i class="bi bi-gear me-1"></i>General
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="juridico-tab" data-bs-toggle="pill" data-bs-target="#juridico-content" type="button" role="tab">
+                                <i class="bi bi-scale me-1"></i>Análisis Jurídico
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="modalTabsContent">
+                        <!-- TAB 1: GENERAL -->
+                        <div class="tab-pane fade show active" id="general-content" role="tabpanel">
+                            <div class="row g-3">
+                                <!-- Estado -->
+                                <div class="col-md-6">
+                                    <label for="estado" class="form-label">Estado del Caso</label>
+                                    <select name="estado" id="estado" class="form-select" required>
+                                        {% for value, label in estados_choices %}
+                                            <option value="{{ value }}" {% if caso.estado == value %}selected{% endif %}>
+                                                {{ label }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <!-- Prioridad -->
+                                <div class="col-md-6">
+                                    <label for="prioridad" class="form-label">Prioridad</label>
+                                    <select name="prioridad" id="prioridad" class="form-select" required>
+                                        {% for value, label in prioridades_choices %}
+                                            <option value="{{ value }}" {% if caso.prioridad == value %}selected{% endif %}>
+                                                {{ label }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <!-- Observaciones del Abogado -->
+                                <div class="col-12">
+                                    <label for="observaciones_abogado" class="form-label">Observaciones del Abogado</label>
+                                    <textarea name="observaciones_abogado" id="observaciones_abogado" class="form-control" rows="4" 
+                                              placeholder="Agregue sus observaciones sobre el caso...">{{ caso.observaciones_abogado }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- TAB 2: ANÁLISIS JURÍDICO -->
+                        <div class="tab-pane fade" id="juridico-content" role="tabpanel">
+                            <div class="row g-4">
+                                <!-- Delito -->
+                                <div class="col-12">
+                                    <div class="card bg-danger bg-opacity-10 border-danger border-opacity-25">
+                                        <div class="card-body">
+                                            <h6 class="card-title text-danger mb-3">
+                                                <i class="bi bi-exclamation-triangle-fill me-2"></i>Identificación del Delito
+                                            </h6>
+                                            <label for="delito" class="form-label">Delito Identificado</label>
+                                            <select name="delito" id="delito" class="form-select">
+                                                <option value="">Seleccione el delito identificado...</option>
+                                                {% for delito in delitos %}
+                                                    <option value="{{ delito.id }}" {% if caso.delito_id == delito.id %}selected{% endif %}>
+                                                        {{ delito.codigo }} - {{ delito.nombre }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                            <small class="text-muted">Seleccione el delito que mejor corresponda al caso analizado</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Preguntas Jurídicas -->
+                                <div class="col-12">
+                                    <div class="row g-3">
+                                        <!-- Interacción Directa -->
+                                        <div class="col-12">
+                                            <div class="card bg-info bg-opacity-10 border-info border-opacity-25">
+                                                <div class="card-body">
+                                                    <h6 class="card-title text-info mb-3">
+                                                        <i class="bi bi-person-check-fill me-2"></i>¿Interacción directa con el usuario?
+                                                    </h6>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio" name="interaccion_directa_usuario" id="interaccion_si" value="1" {% if caso.interaccion_directa_usuario %}checked{% endif %}>
+                                                        <label class="form-check-label" for="interaccion_si">
+                                                            <i class="bi bi-check-circle text-success me-1"></i>SÍ
+                                                        </label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio" name="interaccion_directa_usuario" id="interaccion_no" value="0" {% if caso.interaccion_directa_usuario == False %}checked{% endif %}>
+                                                        <label class="form-check-label" for="interaccion_no">
+                                                            <i class="bi bi-x-circle text-danger me-1"></i>NO
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Habeas Corpus -->
+                                        <div class="col-md-6">
+                                            <div class="card bg-warning bg-opacity-10 border-warning border-opacity-25">
+                                                <div class="card-body">
+                                                    <h6 class="card-title text-warning mb-3">
+                                                        <i class="bi bi-shield-check me-2"></i>¿Habeas Corpus?
+                                                    </h6>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio" name="habeas_corpus" id="habeas_si" value="1" {% if caso.habeas_corpus %}checked{% endif %}>
+                                                        <label class="form-check-label" for="habeas_si">
+                                                            <i class="bi bi-check-circle text-success me-1"></i>SÍ
+                                                        </label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio" name="habeas_corpus" id="habeas_no" value="0" {% if caso.habeas_corpus == False %}checked{% endif %}>
+                                                        <label class="form-check-label" for="habeas_no">
+                                                            <i class="bi bi-x-circle text-danger me-1"></i>NO
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Tutela -->
+                                        <div class="col-md-6">
+                                            <div class="card bg-success bg-opacity-10 border-success border-opacity-25">
+                                                <div class="card-body">
+                                                    <h6 class="card-title text-success mb-3">
+                                                        <i class="bi bi-shield-fill-check me-2"></i>¿Tutela?
+                                                    </h6>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio" name="tutela" id="tutela_si" value="1" {% if caso.tutela %}checked{% endif %}>
+                                                        <label class="form-check-label" for="tutela_si">
+                                                            <i class="bi bi-check-circle text-success me-1"></i>SÍ
+                                                        </label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio" name="tutela" id="tutela_no" value="0" {% if caso.tutela == False %}checked{% endif %}>
+                                                        <label class="form-check-label" for="tutela_no">
+                                                            <i class="bi bi-x-circle text-danger me-1"></i>NO
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i>Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Guardar Cambios
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

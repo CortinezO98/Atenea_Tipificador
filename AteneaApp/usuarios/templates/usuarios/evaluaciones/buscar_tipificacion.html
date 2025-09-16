@@ -1,0 +1,386 @@
+{% extends 'usuarios/base/base.html' %}
+{% block title %}Buscar Tipificaciones{% endblock %}
+{% load static %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="text-center mb-5">
+        <h1 class="fw-bold text-primary mb-3">Buscar Tipificaciones</h1>
+        <p class="lead text-muted">
+            Ingresa el número de documento para ver todas las tipificaciones asociadas.
+        </p>
+    </div>
+
+    <form method="get" class="mb-4" novalidate>
+        <div class="row g-3 justify-content-center">
+            <div class="col-12 col-md-8 col-lg-6">
+                <div class="input-group">
+                    <input type="search" name="q" class="form-control form-control-lg" placeholder="Ej: 1100551234"
+                        aria-label="Buscar por documento" value="{{ query }}" required>
+                    <button type="submit" class="btn btn-primary btn-lg px-4">
+                        <i class="bi bi-search me-2"></i>Buscar
+                    </button>
+                </div>
+                <small class="form-text text-muted mt-2">
+                    Presiona Enter o clic en Buscar
+                </small>
+            </div>
+        </div>
+    </form>
+
+    {% if evaluaciones %}
+    <div class="table-responsive rounded-3 shadow-sm">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-primary">
+                <tr>
+                    <th>Fecha</th>
+                    <th>Tipo Doc.</th>
+                    <th>Documento</th>
+                    <th>Nombre</th>
+                    <th>ID Convers.</th>
+                    <th>Tipo Canal</th>
+                    <th>Segmento</th>
+                    <th>Tipificación</th>
+                    <th>Categoría</th>
+                    <th>Observación</th>
+                    <th>Usuario</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ev in evaluaciones %}
+                <tr>
+                    <td>{{ ev.fecha|date:"d/m/Y H:i" }}</td>
+                    <td>{{ ev.ciudadano.tipo_identificacion.nombre }}</td>
+                    <td class="fw-bold">{{ ev.ciudadano.numero_identificacion }}</td>
+                    <td>{{ ev.ciudadano.nombre }}</td>
+                    <td><code>{{ ev.conversacion_id }}</code></td>
+                    <td>
+                        {% if ev.tipo_canal %}
+                            {{ ev.tipo_canal.nombre }}
+                        {% else %}
+                            <span class="text-muted">Sin tipo canal</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if ev.segmento %}
+                            {{ ev.segmento.nombre }}
+                        {% else %}
+                            <span class="text-muted">Sin segmento</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if ev.tipificacion %}
+                            {{ ev.tipificacion.nombre }}
+                        {% else %}
+                            <span class="text-muted">Sin tipificación</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ ev.categoria.nombre }}</td>
+                    <td>{{ ev.observacion|truncatechars:50 }}</td>
+                    <td>{{ ev.user.username }}</td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                data-bs-toggle="modal" data-bs-target="#detalleModal"
+                                data-fecha="{{ ev.fecha|date:'d/m/Y H:i' }}"
+                                data-tipo="{{ ev.ciudadano.tipo_identificacion.nombre }}"
+                                data-documento="{{ ev.ciudadano.numero_identificacion }}"
+                                data-nombre="{{ ev.ciudadano.nombre }}"
+                                data-conversacion_id="{{ ev.conversacion_id }}"
+                                data-tipocanal="{{ ev.tipo_canal.nombre|default:'Sin tipo canal' }}"
+                                data-segmento="{{ ev.segmento.nombre|default:'Sin segmento' }}"
+                                data-segmentoii="{% if ev.segmento_ii %}{{ ev.segmento_ii.nombre }}{% else %}N/A{% endif %}"
+                                data-tipificacion="{{ ev.tipificacion.nombre|default:'Sin tipificación' }}"
+                                data-categoria="{{ ev.categoria.nombre }}"
+                                data-observacion="{{ ev.observacion|escape }}"
+                                data-usuario="{{ ev.user.username }}"
+                                data-correo="{% if ev.ciudadano.correo %}{{ ev.ciudadano.correo }}{% endif %}"
+                                data-telefono="{% if ev.ciudadano.telefono %}{{ ev.ciudadano.telefono }}{% endif %}"
+                                data-direccion="{% if ev.ciudadano.direccion_residencia %}{{ ev.ciudadano.direccion_residencia }}{% endif %}"
+                                data-pais="{% if ev.ciudadano.pais %}{{ ev.ciudadano.pais.nombre }}{% endif %}"
+                                data-ciudad="{% if ev.ciudadano.ciudad %}{{ ev.ciudadano.ciudad }}{% endif %}"
+                                data-cual_otro_delito="{% if ev.cual_otro_delito %}{{ ev.cual_otro_delito }}{% else %}N/A{% endif %}"
+                        >
+                            Ver detalles
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if is_paginated %}
+    <nav class="mt-4" aria-label="Paginación">
+        <ul class="pagination justify-content-center flex-wrap">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?q={{ query }}&page=1" aria-label="Primera">
+                    &laquo;&laquo;
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?q={{ query }}&page={{ page_obj.previous_page_number }}"
+                    aria-label="Anterior">
+                    &lsaquo;
+                </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+            {% if num >= page_obj.number|add:-2 and num <= page_obj.number|add:2 %}
+                <li class="page-item {% if num == page_obj.number %}active{% endif %}">
+                    <a class="page-link" href="?q={{ query }}&page={{ num }}">{{ num }}</a>
+                </li>
+            {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?q={{ query }}&page={{ page_obj.next_page_number }}"
+                    aria-label="Siguiente">
+                    &rsaquo;
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?q={{ query }}&page={{ page_obj.paginator.num_pages }}"
+                    aria-label="Última">
+                    &raquo;&raquo;
+                </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+
+    {% elif query %}
+    <div class="alert alert-warning text-center mt-5 shadow-sm">
+        <div class="d-inline-block p-3 bg-white rounded-circle mb-3">
+            <i class="bi bi-search-x fs-2 text-warning"></i>
+        </div>
+        <h4 class="alert-heading">¡No se encontraron resultados!</h4>
+        <p>Revisa el número de documento e inténtalo de nuevo.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal de detalles actualizado -->
+<div class="modal fade" id="detalleModal" tabindex="-1" aria-labelledby="detalleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-light border-bottom-0 pb-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-primary bg-opacity-10 p-3 rounded-3">
+                        <i class="fas fa-clipboard-check fa-lg text-primary"></i>
+                    </div>
+                    <div>
+                        <h3 class="modal-title h4 fw-bold text-dark mb-0" id="detalleModalLabel">Detalles de Evaluación</h3>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <!-- Cuerpo -->
+            <div class="modal-body pt-0">
+                <div class="row g-4">
+                    
+                    <!-- Sección Principal -->
+                    <div class="col-12">
+                        <div class="card border-light shadow-sm">
+                            <div class="card-body">
+                                <h5 class="fw-bold text-muted mb-4">Datos del Ciudadano</h5>
+                                <div class="row g-4">
+                                    
+                                    <!-- Grupo 1: Información Básica -->
+                                    <div class="col-md-4 border-end">
+                                        <dl>
+                                            <dt class="text-muted small text-uppercase mb-2">Información Básica</dt>
+                                            <dd class="mb-3">
+                                                <div class="small text-muted">Fecha</div>
+                                                <div class="fw-medium" id="md-fecha"></div>
+                                            </dd>
+                                            <dd class="mb-3">
+                                                <div class="small text-muted">Tipo de Documento</div>
+                                                <div class="fw-medium" id="md-tipo"></div>
+                                            </dd>
+                                            <dd class="mb-3">
+                                                <div class="small text-muted">Número de Documento</div>
+                                                <div class="fw-medium" id="md-documento"></div>
+                                            </dd>
+                                        </dl>
+                                    </div>
+
+                                    <!-- Grupo 2: Datos Personales -->
+                                    <div class="col-md-4 border-end">
+                                        <dl>
+                                            <dt class="text-muted small text-uppercase mb-2">Datos Personales</dt>
+                                            <dd class="mb-3">
+                                                <div class="small text-muted">Nombre completo</div>
+                                                <div class="fw-medium" id="md-nombre"></div>
+                                            </dd>
+                                            <dd class="mb-3">
+                                                <div class="small text-muted">Correo electrónico</div>
+                                                <div class="fw-medium" id="md-correo"></div>
+                                            </dd>
+                                            <dd class="mb-0">
+                                                <div class="small text-muted">Teléfono celular</div>
+                                                <div class="fw-medium" id="md-telefono"></div>
+                                            </dd>
+                                        </dl>
+                                    </div>
+
+                                    <!-- Grupo 3: Ubicación -->
+                                    <div class="col-md-4">
+                                        <dl>
+                                            <dt class="text-muted small text-uppercase mb-2">Ubicación</dt>
+                                            <dd class="mb-3">
+                                                <div class="small text-muted">País</div>
+                                                <div class="fw-medium" id="md-pais"></div>
+                                            </dd>
+                                            <dd class="mb-3">
+                                                <div class="small text-muted">Ciudad</div>
+                                                <div class="fw-medium" id="md-ciudad"></div>
+                                            </dd>
+                                            <dd class="mb-0">
+                                                <div class="small text-muted">Dirección</div>
+                                                <div class="fw-medium" id="md-direccion"></div>
+                                            </dd>
+                                        </dl>
+                                    </div>
+
+                                    <!-- ID Conversación -->
+                                    <div class="col-12 border-top pt-4">
+                                        <div class="small text-muted text-uppercase">ID de Conversación</div>
+                                        <div class="fw-medium text-primary" id="md-conversacion_id"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sección Secundaria -->
+                    <div class="col-lg-4">
+                        <div class="card border-light shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="fw-bold text-muted mb-4">Clasificación</h5>
+                                <ul class="list-unstyled mb-0">
+                                    <li class="mb-3">
+                                        <div class="small text-muted text-uppercase">Tipo Canal</div>
+                                        <div class="fw-medium" id="md-tipocanal"></div>
+                                    </li>
+                                    <li class="mb-3">
+                                        <div class="small text-muted text-uppercase">Segmento</div>
+                                        <div class="fw-medium" id="md-segmento"></div>
+                                    </li>
+                                    <li class="mb-3">
+                                        <div class="small text-muted text-uppercase">Segmento II</div>
+                                        <div class="fw-medium" id="md-segmentoii"></div>
+                                    </li>
+                                    <li class="mb-3">
+                                        <div class="small text-muted text-uppercase">Tipificación</div>
+                                        <div class="fw-medium" id="md-tipificacion"></div>
+                                    </li>
+                                    <li class="mb-3">
+                                        <div class="small text-muted text-uppercase">Categoría</div>
+                                        <div class="fw-medium" id="md-categoria"></div>
+                                    </li>
+                                    <li class="mb-0">
+                                        <div class="small text-muted text-uppercase">¿Cuál otro delito?</div>
+                                        <div class="fw-medium" id="md-cual_otro_delito"></div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Observaciones -->
+                    <div class="col-lg-8">
+                        <div class="card border-light shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="fw-bold text-muted mb-0">Observaciones</h5>
+                                    <span class="badge bg-primary bg-opacity-10 text-primary small">
+                                        <i class="fas fa-expand-alt me-2"></i>Texto completo
+                                    </span>
+                                </div>
+                                <div class="observation-scroll" style="max-height: 200px; overflow-y: auto;">
+                                    <p class="text-muted mb-0 pre-line" id="md-observacion"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pie -->
+            <div class="modal-footer bg-light border-top-0 pt-3">
+                <button type="button" class="btn btn-primary px-4" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var detalleModal = document.getElementById('detalleModal');
+    detalleModal.addEventListener('show.bs.modal', function (event) {
+        var btn = event.relatedTarget;
+        var campos = [
+            'fecha', 'tipo', 'documento', 'nombre',
+            'correo', 'telefono', 'pais', 'ciudad', 
+            'direccion', 'conversacion_id', 'usuario',
+            'tipocanal', 'segmento', 'segmentoii', 'tipificacion', 
+            'categoria', 'observacion', 'cual_otro_delito'
+        ];
+        
+        campos.forEach(function (field) {
+            var element = document.getElementById('md-' + field);
+            if(element) {
+                var valor = btn.getAttribute('data-' + field) || 'N/A';
+                element.textContent = valor;
+            }
+        });
+    });
+});
+</script>
+
+<style>
+    .observation-scroll {
+        overflow-y: auto;
+        max-height: 300px;
+        padding-right: 10px;
+        border-radius: 8px;
+        scrollbar-width: thin;
+        scrollbar-color: #d1d5db transparent;
+    }
+
+    .observation-scroll::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .observation-scroll::-webkit-scrollbar-thumb {
+        background-color: #d1d5db;
+        border-radius: 4px;
+    }
+
+    .observation-scroll::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .pre-line {
+        white-space: pre-line;
+        line-height: 1.6;
+    }
+
+    .card {
+        border-radius: 12px;
+    }
+</style>
+
+{% endblock %}

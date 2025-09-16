@@ -1,0 +1,343 @@
+{% extends 'usuarios/base/base.html' %}
+{% block title %}Búsqueda Avanzada de Casos{% endblock %}
+{% load static %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="fw-bold text-success mb-2">
+                <i class="bi bi-search me-2"></i>Búsqueda Avanzada de Casos
+            </h1>
+            <p class="text-muted mb-0">Utiliza los filtros para encontrar casos específicos</p>
+        </div>
+        <div>
+            <a href="{% url 'dashboard_abogado' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Volver al Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Formulario de Búsqueda Avanzada -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="bi bi-funnel me-2"></i>Filtros de Búsqueda
+            </h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <!-- Número de Documento -->
+                <div class="col-md-6 col-lg-3">
+                    <label for="numero_documento" class="form-label">
+                        <i class="bi bi-card-text me-1"></i>Número de Documento
+                    </label>
+                    <input type="text" name="numero_documento" id="numero_documento" class="form-control" 
+                           value="{{ request.GET.numero_documento }}" placeholder="Ej: 12345678">
+                </div>
+
+                <!-- Estado -->
+                <div class="col-md-6 col-lg-3">
+                    <label for="estado" class="form-label">
+                        <i class="bi bi-flag me-1"></i>Estado
+                    </label>
+                    <select name="estado" id="estado" class="form-select">
+                        <option value="">Todos los estados</option>
+                        {% for value, label in estados_choices %}
+                            <option value="{{ value }}" {% if request.GET.estado == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Prioridad -->
+                <div class="col-md-6 col-lg-3">
+                    <label for="prioridad" class="form-label">
+                        <i class="bi bi-exclamation-triangle me-1"></i>Prioridad
+                    </label>
+                    <select name="prioridad" id="prioridad" class="form-select">
+                        <option value="">Todas las prioridades</option>
+                        {% for value, label in prioridades_choices %}
+                            <option value="{{ value }}" {% if request.GET.prioridad == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Rango de Fechas -->
+                <div class="col-md-6 col-lg-3">
+                    <label for="fecha_desde" class="form-label">
+                        <i class="bi bi-calendar-event me-1"></i>Fecha Desde
+                    </label>
+                    <input type="date" name="fecha_desde" id="fecha_desde" class="form-control" 
+                           value="{{ request.GET.fecha_desde }}">
+                </div>
+
+                <div class="col-md-6 col-lg-3">
+                    <label for="fecha_hasta" class="form-label">
+                        <i class="bi bi-calendar-check me-1"></i>Fecha Hasta
+                    </label>
+                    <input type="date" name="fecha_hasta" id="fecha_hasta" class="form-control" 
+                           value="{{ request.GET.fecha_hasta }}">
+                </div>
+
+                <!-- Botones -->
+                <div class="col-12 d-flex gap-2 justify-content-end">
+                    <a href="{% url 'buscar_casos_abogado' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Limpiar
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-search me-1"></i>Buscar Casos
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Resultados de Búsqueda -->
+    {% if casos %}
+        <div class="card shadow-sm">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-ul me-2"></i>Resultados de Búsqueda
+                </h5>
+                <span class="badge bg-light text-dark">{{ casos|length }} caso{{ casos|length|pluralize:"s" }} encontrado{{ casos|length|pluralize:"s" }}</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Caso #</th>
+                                <th>Ciudadano</th>
+                                <th>Documento</th>
+                                <th>Tipificación</th>
+                                <th>Estado</th>
+                                <th>Prioridad</th>
+                                <th>Asignado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for caso in casos %}
+                                <tr>
+                                    <td class="fw-bold">#{{ caso.id }}</td>
+                                    <td>
+                                        <div class="fw-semibold">{{ caso.evaluacion.ciudadano.nombre|truncatechars:25 }}</div>
+                                        {% if caso.evaluacion.ciudadano.correo %}
+                                            <small class="text-muted">{{ caso.evaluacion.ciudadano.correo }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark">
+                                            {{ caso.evaluacion.ciudadano.tipo_identificacion.nombre }}
+                                        </span><br>
+                                        <small>{{ caso.evaluacion.ciudadano.numero_identificacion }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="small">{{ caso.evaluacion.tipificacion.nombre|truncatechars:30 }}</div>
+                                        {% if caso.evaluacion.categoria %}
+                                            <small class="text-muted">{{ caso.evaluacion.categoria.nombre|truncatechars:25 }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if caso.estado == 'PENDIENTE' %}
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="bi bi-clock me-1"></i>Pendiente
+                                            </span>
+                                        {% elif caso.estado == 'EN_REVISION' %}
+                                            <span class="badge bg-info">
+                                                <i class="bi bi-eye me-1"></i>En Revisión
+                                            </span>
+                                        {% elif caso.estado == 'COMPLETADO' %}
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-check-circle me-1"></i>Completado
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">
+                                                <i class="bi bi-x-circle me-1"></i>Cerrado
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if caso.prioridad == 'ALTA' %}
+                                            <span class="badge bg-danger">
+                                                <i class="bi bi-exclamation-triangle-fill me-1"></i>Alta
+                                            </span>
+                                        {% elif caso.prioridad == 'MEDIA' %}
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="bi bi-dash-circle-fill me-1"></i>Media
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-info">
+                                                <i class="bi bi-info-circle-fill me-1"></i>Baja
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ caso.fecha_asignacion|timesince }} atrás</small><br>
+                                        <small class="text-muted">{{ caso.fecha_asignacion|date:"d/m/Y" }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex gap-1">
+                                            <a href="{% url 'detalle_caso_abogado' caso.id %}" 
+                                               class="btn btn-outline-primary btn-sm" title="Ver Detalles">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            {% if caso.estado != 'CERRADO' %}
+                                                <button type="button" class="btn btn-outline-success btn-sm" 
+                                                        title="Actualizar Estado" data-bs-toggle="modal" 
+                                                        data-bs-target="#quickUpdateModal{{ caso.id }}">
+                                                    <i class="bi bi-pencil-square"></i>
+                                                </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <!-- Modal para Actualización Rápida -->
+                                <div class="modal fade" id="quickUpdateModal{{ caso.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <form method="POST" action="{% url 'detalle_caso_abogado' caso.id %}">
+                                                {% csrf_token %}
+                                                <div class="modal-header">
+                                                    <h6 class="modal-title">Actualización Rápida - Caso #{{ caso.id }}</h6>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <div class="row g-3">
+                                                        <div class="col-12">
+                                                            <label class="form-label">Estado</label>
+                                                            <select name="estado" class="form-select" required>
+                                                                {% for value, label in estados_choices %}
+                                                                    <option value="{{ value }}" {% if caso.estado == value %}selected{% endif %}>
+                                                                        {{ label }}
+                                                                    </option>
+                                                                {% endfor %}
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <label class="form-label">Observación Rápida</label>
+                                                            <textarea name="observaciones_abogado" class="form-control" rows="3" 
+                                                                      placeholder="Agregar observación...">{{ caso.observaciones_abogado }}</textarea>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                                                        Cancelar
+                                                    </button>
+                                                    <button type="submit" class="btn btn-primary btn-sm">
+                                                        <i class="bi bi-check-lg me-1"></i>Actualizar
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estadísticas de la Búsqueda -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-0 bg-light">
+                    <div class="card-body py-3">
+                        <div class="row text-center">
+                            <div class="col-6 col-md-3">
+                                <div class="fw-bold text-warning">{{ casos|length }}</div>
+                                <small class="text-muted">Total Encontrados</small>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="fw-bold text-danger">
+                                    {% with casos|dictsort:"estado" as casos_ordenados %}
+                                        {{ casos_ordenados|length }}
+                                    {% endwith %}
+                                </div>
+                                <small class="text-muted">En esta Búsqueda</small>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="fw-bold text-info">
+                                    {% if request.GET.fecha_desde and request.GET.fecha_hasta %}
+                                        <i class="bi bi-calendar-range"></i>
+                                    {% else %}
+                                        <i class="bi bi-calendar"></i>
+                                    {% endif %}
+                                </div>
+                                <small class="text-muted">Filtro de Fecha</small>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="fw-bold text-success">
+                                    <i class="bi bi-funnel-fill"></i>
+                                </div>
+                                <small class="text-muted">Filtros Aplicados</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    {% elif request.GET %}
+        <!-- No hay resultados pero sí hay búsqueda -->
+        <div class="alert alert-info text-center py-5">
+            <i class="bi bi-search fs-1 text-muted mb-3"></i>
+            <h4>No se encontraron casos</h4>
+            <p class="text-muted">No hay casos que coincidan con los criterios de búsqueda especificados.</p>
+            <div class="d-flex gap-2 justify-content-center">
+                <a href="{% url 'buscar_casos_abogado' %}" class="btn btn-outline-primary">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Limpiar Filtros
+                </a>
+                <a href="{% url 'mis_casos_abogado' %}" class="btn btn-primary">
+                    <i class="bi bi-list-check me-1"></i>Ver Todos mis Casos
+                </a>
+            </div>
+        </div>
+
+    {% else %}
+        <!-- Estado inicial - sin búsqueda -->
+        <div class="alert alert-light text-center py-5 border-2 border-dashed">
+            <i class="bi bi-search fs-1 text-muted mb-3"></i>
+            <h4 class="text-muted">Búsqueda Avanzada</h4>
+            <p class="text-muted">Utiliza los filtros de arriba para buscar casos específicos.</p>
+            <div class="d-flex gap-2 justify-content-center">
+                <a href="{% url 'mis_casos_abogado' %}" class="btn btn-outline-primary">
+                    <i class="bi bi-list-check me-1"></i>Ver Todos mis Casos
+                </a>
+                <a href="{% url 'dashboard_abogado' %}" class="btn btn-primary">
+                    <i class="bi bi-speedometer2 me-1"></i>Ir al Dashboard
+                </a>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-configurar fecha máxima en "fecha_hasta"
+    const fechaDesde = document.getElementById('fecha_desde');
+    const fechaHasta = document.getElementById('fecha_hasta');
+    
+    fechaDesde.addEventListener('change', function() {
+        fechaHasta.min = this.value;
+    });
+    
+    fechaHasta.addEventListener('change', function() {
+        fechaDesde.max = this.value;
+    });
+    
+    // Configurar fecha máxima como hoy
+    const hoy = new Date().toISOString().split('T')[0];
+    fechaDesde.max = hoy;
+    fechaHasta.max = hoy;
+});
+</script>
+
+{% endblock %}

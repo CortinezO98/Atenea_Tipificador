@@ -1,0 +1,149 @@
+{% extends 'usuarios/base/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm border-0 rounded-3 mb-4">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <div>
+                            <h2 class="h4 fw-semibold text-primary mb-1">Panel del Agente</h2>
+                            <p class="text-muted mb-0">Bienvenido, {{ request.user.get_full_name|default:request.user.username }}</p>
+                        </div>
+                        <div class="badge bg-primary bg-opacity-10 text-primary p-2">
+                            <i class="bi bi-person-badge me-2"></i>Agente
+                        </div>
+                    </div>
+                    <div class="row g-4">
+                    <div class="col-xl-6">
+                        <a href="{% url 'crear_evaluacion' %}" class="card hover-scale shadow-sm border-0 rounded-4 h-100 text-decoration-none">
+                            <div class="card-body p-4">
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="icon-shape-lg bg-primary bg-opacity-10 text-primary rounded-3">
+                                        <i class="bi bi-file-earmark-plus fs-2"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="h5 fw-bold mb-0">Nueva Tipificación</h3>
+                                        <p class="text-muted small mb-0">Iniciar proceso de tipificación</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer bg-transparent border-0 py-3 bg-primary bg-opacity-5">
+                                <small class="text-primary"><i class="bi bi-arrow-right-short"></i> Click para comenzar</small>
+                            </div>
+                        </a>
+                    </div>
+
+                    <div class="col-xl-6">
+                        <a href="{% url 'buscar_tipificacion' %}" class="card hover-scale shadow-sm border-0 rounded-4 h-100 text-decoration-none">
+                            <div class="card-body p-4">
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="icon-shape-lg bg-info bg-opacity-10 text-info rounded-3">
+                                        <i class="bi bi-search fs-2"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="h5 fw-bold mb-0">Buscar Casos</h3>
+                                        <p class="text-muted small mb-0">Consultar tipificaciones existentes</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer bg-transparent border-0 py-3 bg-info bg-opacity-5">
+                                <small class="text-info"><i class="bi bi-arrow-right-short"></i> Acceder al historial</small>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 rounded-3">
+                <div class="card-header bg-white border-0 pb-0 pt-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="h5 fw-semibold mb-0"><i class="bi bi-clock-history text-primary me-2"></i>Historial de tipificaciones</h4>
+                    </div>
+                </div>
+                <div class="card-body px-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Fecha</th>
+                                    <th>Documento</th>
+                                    <th>Ciudadano</th>
+                                    <th>Categoría</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ev in evaluaciones %}
+                                <tr>
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>{{ ev.fecha|date:"d/m/Y" }} <small class="text-muted">{{ ev.fecha|time:"H:i" }}</small></td>
+                                    <td>{{ ev.ciudadano.numero_identificacion }}</td>
+                                    <td>{{ ev.ciudadano.nombre|truncatechars:20 }}</n<td>
+                                    <td>{{ ev.categoria.nombre }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted">No se encontraron tipificaciones.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% if is_paginated %}
+                <div class="card-footer bg-white border-0">
+                    <nav>
+                        <ul class="pagination justify-content-center mb-0">
+                            {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ query }}">&laquo;</a></li>{% endif %}
+                            {% for num in paginator.page_range %}{% if num|add:'-1' <= page_obj.number <= num|add:'1' %}<li class="page-item {% if num == page_obj.number %}active{% endif %}"><a class="page-link" href="?page={{ num }}&q={{ query }}">{{ num }}</a></li>{% endif %}{% endfor %}
+                            {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ query }}">&raquo;</a></li>{% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .gradient-primary {
+        background: linear-gradient(135deg, #4a90e2, #6356e5);
+    }
+    
+    .hover-scale {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .hover-scale:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1.5rem rgba(0,0,0,0.15)!important;
+    }
+    
+    .avatar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 50px;
+        height: 50px;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Efecto hover suave
+    document.querySelectorAll('.hover-scale').forEach(card => {
+        card.addEventListener('mouseenter', () => {
+            card.style.transform = 'translateY(-5px)';
+        });
+        card.addEventListener('mouseleave', () => {
+            card.style.transform = 'none';
+        });
+    });
+});
+</script>
+{% endblock %}
