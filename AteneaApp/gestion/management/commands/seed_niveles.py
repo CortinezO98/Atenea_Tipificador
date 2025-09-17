@@ -66,23 +66,30 @@ TREE: Dict[str, Any] = {
             "APOYO DE SOSTENIMIENTO": {
                 "DISPERSIÓN": {
                     "ESTADO DE APOYO DE SOSTENIMIENTO": ["RECHAZADO", "PAGO PENDIENTE", "PAGO EXITOSO"]
+                },
+                "REINTEGRO APOYO ECONÓMICO": {
+                    "DESISTIMIENTO",
+                    "SEMESTRE NO CURSADO APLAZAMIENTO",
+                    "UNIVERSIDAD NO FORMALIZA EL BENEFICIO",
+
+
                 }
             },
-            "REINTEGRO APOYO ECONÓMICO": ["DESISTIMIENTO", "SEMESTRE NO CURSADO APLAZAMIENTO", "UNIVERSIDAD NO FORMALIZA EL BENEFICIO"],
             "BENEFICIOS": ["AUXILIO DE TRANSPORTE", "PAGO DE MATRICULA"],
             "FORMALIZACIÓN": ["CARTA DE COMPROMISO"],
             "CRONOGRAMA": [],
             "RESULTADOS": [],
             "MANUAL OPERATIVO": ["APLAZAMIENTO", "BOLSA DE CRÉDITOS", "CAMBIO DE RUTA", "DESISTIMIENTO", "HOMOLOGAR", "OFERTA IES", "REQUISITOS"],
-        },
-        "JÓVENES A LA E Y JOVENES CON OPORTUNIDADES": {
-            "MANUAL OPERATIVO": {
+            "JÓVENES A LA E Y JOVENES CON OPORTUNIDADES": {
+                "MANUAL OPERATIVO":[],
                 "APOYO DE SOSTENIMIENTO": {
                     "DISPERSIÓN": {
-                        "ESTADO DE APOYO DE SOSTENIMIENTO": ["PAGO PENDIENTE", "PAGO EXITOSO"]
+                        "ESTADO DE APOYO DE SOSTENIMIENTO",
+                        "PAGO PENDIENTE", 
+                        "PAGO EXITOSO",
                     }
                 }
-            }
+            },
         },
         "TALENTO CAPITAL": {
             "TALENTO CAPITAL JOVENES CON OPORTUNIDADES": ["INCRIPCIONES"],
@@ -178,7 +185,8 @@ TREE: Dict[str, Any] = {
     "NO EFECTIVA": {
         "FALLA DE RED": {"CAIDA DE INTERACCIÓN": []},
         "INTERACCIÓN COLGADA": {
-            "CIERRE DE CHAT CON GUION": ["FINALIZA CHAT CIUDADANO"],
+            "CIERRE DE CHAT CON GUION": [],
+            "FINALIZA CHAT CIUDADANO":[],
             "FINALIZA LLAMADA CIUDADANO": [],
             "CIERRE LLAMADA CON GUION": [],
         },

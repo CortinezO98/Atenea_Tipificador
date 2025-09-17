@@ -41,12 +41,23 @@ def index(request):
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value, Roles.SUPERVISOR.value, Roles.AGENTE.value])
 def crear_evaluacion(request):
+    """
+    Crea Evaluación usando solo los insumos mínimos:
+      - Tipos de Identificación (obligatorio para Ciudadano)
+      - Países (opcional en el POST, pero deben existir en BD)
+      - Árbol de Niveles (Categoria nivel 1..6). Se guarda la categoría más profunda escogida.
+
+    Sin dependencias de canales/segmentos/tipificaciones.
+    """
     if request.method == 'POST':
         try:
             with transaction.atomic():
-                # --- Ciudadano / Anónimo ---
+                # -----------------------------
+                # 1) Ciudadano / Anónimo
+                # -----------------------------
                 numero_doc = (request.POST.get('numero_identificacion') or '').strip()
                 es_anonimo = (request.POST.get('es_anonimo') == '1') or (numero_doc in ('9999', '9999999'))
+
                 if es_anonimo:
                     ciudadano = get_ciudadano_anonimo()
                 else:
@@ -74,7 +85,10 @@ def crear_evaluacion(request):
                             ciudad=request.POST.get('ciudad', '')
                         )
 
-                # === CATEGORÍAS: tomar el nivel más profundo disponible (N1→N6) ===
+                # ---------------------------------------------
+                # 2) Categoría final: tomar el nivel más profundo
+                #    disponible (prioridad N6 -> N1)
+                # ---------------------------------------------
                 categoria_final_id = None
                 for key in ('nivel6', 'nivel5', 'nivel4', 'nivel3', 'nivel2', 'nivel1'):
                     val = request.POST.get(key)
@@ -82,10 +96,17 @@ def crear_evaluacion(request):
                         categoria_final_id = val
                         break
 
+                # Validación mínima: debe existir una categoría seleccionada (árbol N1..N6)
+                if not categoria_final_id:
+                    raise ValueError("Debes seleccionar al menos una categoría (N1..N6).")
+
                 # Tel Inconcer (el form puede traer 'telefono_inconser' o 'telefono_inconcer')
                 tel_inconser = request.POST.get('telefono_inconser') or request.POST.get('telefono_inconcer') or ''
 
-                # --- Crear Evaluación SOLO con Categoría Final ---
+                # ---------------------------------------------
+                # 3) Crear Evaluación (solo con categoría final)
+                #    Campos legacy en None
+                # ---------------------------------------------
                 evaluacion = Evaluacion.objects.create(
                     conversacion_id=request.POST['conversacion_id'],
                     observacion=request.POST['observacion'],
@@ -95,7 +116,7 @@ def crear_evaluacion(request):
                     # Solo categoría final (árbol N1→N6)
                     categoria_id=categoria_final_id,
 
-                    # Campos legacy en blanco (no se usan en el flujo por Niveles)
+                    # Legacy OFF
                     tipo_canal=None, segmento=None, segmento_ii=None, segmento_iii=None,
                     segmento_iv=None, segmento_v=None, segmento_vi=None, tipificacion=None,
 
@@ -106,7 +127,9 @@ def crear_evaluacion(request):
                     contacto_telefono_inconcer = tel_inconser,
                 )
 
-                # === Encuesta (token + expiración 24h) ===
+                # ---------------------------------------------
+                # 4) Encuesta (token + expiración 24h)
+                # ---------------------------------------------
                 token = get_random_string(24)
                 expira = now() + timedelta(hours=24)
                 encuesta = Encuesta.objects.create(
@@ -158,15 +181,22 @@ def crear_evaluacion(request):
         except Exception as e:
             RegistrarError(inspect.currentframe().f_code.co_name, str(e), request)
             messages.error(request, f"Ocurrió un error al guardar la evaluación: {str(e)}")
-
         return redirect('index')
 
-    # --- GET: datos básicos del formulario (sin canales/segmentos) ---
+    # ---------------------------------------------------------
+    # GET: datos mínimos del formulario (SIN canales/segmentos)
+    # ---------------------------------------------------------
     tiposIdentificacion = TipoIdentificacion.objects.all()
     paises = Pais.objects.all()
+    hay_nivel1 = Categoria.objects.filter(nivel=1).exists()
 
-    if not tiposIdentificacion:
-        messages.warning(request, "En este momento no es posible generar una tipificación. Por favor, contacte a soporte.")
+    # Guard MÍNIMO: solo lo que sí usas (TiposID, Países y al menos un Nivel 1)
+    if (not tiposIdentificacion.exists()) or (not paises.exists()) or (not hay_nivel1):
+        messages.warning(
+            request,
+            "Faltan datos mínimos (Tipos de identificación, Países o Niveles). "
+            "Ejecuta los seeders mínimos y vuelve a intentar."
+        )
         return redirect('index')
 
     return render(request, 'usuarios/evaluaciones/crear_evaluacion.html', {
@@ -178,7 +208,6 @@ def crear_evaluacion(request):
         ),
         'numero_anonimo': '9999999',
     })
-
 
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value, Roles.SUPERVISOR.value, Roles.AGENTE.value])
