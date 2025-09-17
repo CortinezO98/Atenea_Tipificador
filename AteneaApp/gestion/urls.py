@@ -29,7 +29,10 @@ urlpatterns = [
     path('api/subcategorias-ii/', api.subcategorias_ii, name='subcategorias_ii'),
     path('api/subcategorias-iii/', api.subcategorias_iii, name='subcategorias_iii'),
     path('api/subcategorias-iv/', api.subcategorias_iv, name='subcategorias_iv'),  
-    path('api/subcategorias-v/', api.subcategorias_v, name='subcategorias_v'),    
+    path('api/subcategorias-v/', api.subcategorias_v, name='subcategorias_v'),   
+
+    path('api/niveles/', api.niveles, name='niveles'),
+ 
     
     # ==================== APIs DE COMPATIBILIDAD ====================
     path('api/tipificaciones-old/', api.tipificaciones_old, name='tipificaciones_old'),

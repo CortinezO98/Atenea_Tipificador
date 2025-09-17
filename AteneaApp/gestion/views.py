@@ -44,6 +44,7 @@ def crear_evaluacion(request):
     if request.method == 'POST':
         try:
             with transaction.atomic():
+                # --- Ciudadano / Anónimo ---
                 numero_doc = (request.POST.get('numero_identificacion') or '').strip()
                 es_anonimo = (request.POST.get('es_anonimo') == '1') or (numero_doc in ('9999', '9999999'))
                 if es_anonimo:
@@ -73,50 +74,41 @@ def crear_evaluacion(request):
                             ciudad=request.POST.get('ciudad', '')
                         )
 
-                # === CATEGORÍAS: tomar el nivel más profundo disponible (1→6) ===
+                # === CATEGORÍAS: tomar el nivel más profundo disponible (N1→N6) ===
                 categoria_final_id = None
-                for key in ('subcategoria_vi', 'subcategoria_v', 'subcategoria_iv',
-                            'subcategoria_iii', 'subcategoria_ii', 'subcategoria', 'categoria'):
+                for key in ('nivel6', 'nivel5', 'nivel4', 'nivel3', 'nivel2', 'nivel1'):
                     val = request.POST.get(key)
-                    if val:
+                    if val and val != "0":
                         categoria_final_id = val
                         break
-                if categoria_final_id == "0":
-                    categoria_final_id = None
 
-                # Tel Inconcer (form puede traer inconser/inconcer)
+                # Tel Inconcer (el form puede traer 'telefono_inconser' o 'telefono_inconcer')
                 tel_inconser = request.POST.get('telefono_inconser') or request.POST.get('telefono_inconcer') or ''
 
+                # --- Crear Evaluación SOLO con Categoría Final ---
                 evaluacion = Evaluacion.objects.create(
                     conversacion_id=request.POST['conversacion_id'],
                     observacion=request.POST['observacion'],
                     ciudadano=ciudadano,
                     user=request.user,
 
-                    # Canal / Segmentos 1→6
-                    tipo_canal_id=request.POST.get('tipo_canal'),
-                    segmento_id=request.POST.get('segmento'),
-                    segmento_ii_id=request.POST.get('segmento_ii') or None,
-                    segmento_iii_id=request.POST.get('segmento_iii') or None,
-                    segmento_iv_id=request.POST.get('segmento_iv') or None,
-                    segmento_v_id=request.POST.get('segmento_v') or None,
-                    segmento_vi_id=request.POST.get('segmento_vi') or None,
-
-                    # Tipificación y categoría final (1→6)
-                    tipificacion_id=request.POST.get('tipificacion'),
+                    # Solo categoría final (árbol N1→N6)
                     categoria_id=categoria_final_id,
 
-                    # Contactos para anónimo
+                    # Campos legacy en blanco (no se usan en el flujo por Niveles)
+                    tipo_canal=None, segmento=None, segmento_ii=None, segmento_iii=None,
+                    segmento_iv=None, segmento_v=None, segmento_vi=None, tipificacion=None,
+
+                    # Contactos cuando es anónimo
                     es_anonimo=es_anonimo,
                     contacto_correo   = (request.POST.get('correo', '')   if es_anonimo else None),
                     contacto_telefono = (request.POST.get('telefono', '') if es_anonimo else None),
                     contacto_telefono_inconcer = tel_inconser,
                 )
 
-                # === Crear encuesta de satisfacción (token + expiración) ===
+                # === Encuesta (token + expiración 24h) ===
                 token = get_random_string(24)
                 expira = now() + timedelta(hours=24)
-
                 encuesta = Encuesta.objects.create(
                     evaluacion=evaluacion,
                     agente=request.user,
@@ -131,32 +123,20 @@ def crear_evaluacion(request):
                     reverse('encuesta_publica', kwargs={'token': token})
                 )
 
-                encuesta_url = request.build_absolute_uri(
-                    reverse('encuesta_publica', kwargs={'token': token})
-                )
-
+                # Log útil para depurar qué niveles llegaron por POST
                 debug_info = {
-                    'tipo_canal': request.POST.get('tipo_canal'),
-                    'segmento': request.POST.get('segmento'),
-                    'segmento_ii': request.POST.get('segmento_ii'),
-                    'segmento_iii': request.POST.get('segmento_iii'),
-                    'segmento_iv': request.POST.get('segmento_iv'),
-                    'segmento_v': request.POST.get('segmento_v'),
-                    'segmento_vi': request.POST.get('segmento_vi'),
-                    'tipificacion': request.POST.get('tipificacion'),
-                    'categoria': request.POST.get('categoria'),
-                    'subcategoria': request.POST.get('subcategoria'),
-                    'subcategoria_ii': request.POST.get('subcategoria_ii'),
-                    'subcategoria_iii': request.POST.get('subcategoria_iii'),
-                    'subcategoria_iv': request.POST.get('subcategoria_iv'),
-                    'subcategoria_v': request.POST.get('subcategoria_v'),
-                    'subcategoria_vi': request.POST.get('subcategoria_vi'),
+                    'nivel1': request.POST.get('nivel1'),
+                    'nivel2': request.POST.get('nivel2'),
+                    'nivel3': request.POST.get('nivel3'),
+                    'nivel4': request.POST.get('nivel4'),
+                    'nivel5': request.POST.get('nivel5'),
+                    'nivel6': request.POST.get('nivel6'),
                     'categoria_final_id': categoria_final_id,
                     'es_anonimo': request.POST.get('es_anonimo'),
                     'telefono_inconcer': tel_inconser,
                     'encuesta_token': encuesta.token,
                 }
-                print(f"DEBUG - Crear evaluación: {debug_info}")
+                print(f"DEBUG - Crear evaluación (solo Niveles): {debug_info}")
 
                 messages.success(
                     request,
@@ -171,7 +151,7 @@ def crear_evaluacion(request):
                         '<code class="text-break small d-block">{}</code>'
                         '</div>'
                         '<small class="text-muted d-block mt-1 text-center">Comparte este enlace para acceder a la evaluación</small>',
-                        encuesta_url, encuesta_url
+                        encuesta_url
                     )
                 )
 
@@ -181,17 +161,16 @@ def crear_evaluacion(request):
 
         return redirect('index')
 
+    # --- GET: datos básicos del formulario (sin canales/segmentos) ---
     tiposIdentificacion = TipoIdentificacion.objects.all()
-    tipos_canal = TipoCanal.objects.all()
     paises = Pais.objects.all()
 
-    if not tiposIdentificacion or not tipos_canal:
+    if not tiposIdentificacion:
         messages.warning(request, "En este momento no es posible generar una tipificación. Por favor, contacte a soporte.")
         return redirect('index')
 
     return render(request, 'usuarios/evaluaciones/crear_evaluacion.html', {
         'tiposIdentificacion': tiposIdentificacion,
-        'tipos_canal': tipos_canal,
         'paises': paises,
         'is_supervisor': (
             ValidarRolUsuario(request, Roles.SUPERVISOR.value)
@@ -380,7 +359,7 @@ def exportar_excel(request):
     fecha_inicio = request.GET.get('fecha_inicio')
     fecha_fin    = request.GET.get('fecha_fin')
     usuario      = request.GET.get('usuario')
-    canal        = request.GET.get('canal')
+    canal        = request.GET.get('canal')  # opcional (compatibilidad)
 
     qs = (
         Evaluacion.objects
@@ -390,18 +369,14 @@ def exportar_excel(request):
             'categoria__tipificacion',
             'categoria__categoria_padre',
             'user',
-            'tipo_canal',
-            'segmento',
-            'segmento_ii',
-            'segmento_iii',
-            'segmento_iv',
-            'segmento_v',
-            'segmento_vi',
-            'tipificacion',
+            # Relaciones legacy (no exportamos sus columnas, pero no molestan):
+            'tipo_canal', 'segmento', 'segmento_ii', 'segmento_iii',
+            'segmento_iv', 'segmento_v', 'segmento_vi', 'tipificacion',
         )
         .order_by('-fecha')
     )
 
+    # Filtros de fechas
     if quick in ('hoy', 'ayer', '7d') or hoy_flag:
         use_quick = quick or 'hoy'
         start, end, _ = get_quick_range(use_quick)
@@ -422,11 +397,13 @@ def exportar_excel(request):
             start, end, _ = get_quick_range('hoy')
             qs = qs.filter(fecha__range=(start, end))
 
+    # Filtros adicionales
     if usuario and str(usuario).isdigit():
         qs = qs.filter(user_id=int(usuario))
     if canal and str(canal).isdigit():
         qs = qs.filter(tipo_canal_id=int(canal))
 
+    # ---- Excel (1 sola hoja) ----
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Reportes"
@@ -437,23 +414,33 @@ def exportar_excel(request):
         'Correo contacto', 'Teléfono contacto', 'Teléfono Inconcer',
         'País', 'Ciudad', 'Dirección',
         'ID Conversación',
-        'Tipo Canal', 'Segmento I', 'Segmento II', 'Segmento III', 'Segmento IV', 'Segmento V', 'Segmento VI',
-        'Tipificación',
-        'Categoría (N1)', 'N2', 'N3', 'N4', 'N5', 'N6', 'Nivel Final',
+
+        # SOLO NIVELES
+        'Nivel 1', 'Nivel 2', 'Nivel 3', 'Nivel 4', 'Nivel 5', 'Nivel 6', 'Nivel Final',
+
+        # ENCUESTA DE SATISFACCIÓN (misma fila)
+        'Encuesta estado', 'Encuesta respondida en', 'Encuesta token', 'Encuesta URL',
+        'Encuesta promedio (escala 1-5)', 'Encuesta respuestas (texto)',
+
         'Observación',
         'Usuario'
     ]
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
 
+    # Imports locales
+    from .models import Encuesta, RespuestaEncuesta
+
     for row_idx, ev in enumerate(qs.iterator(), start=2):
         ciu = ev.ciudadano
 
-        correo_base = ciu.correo or ''
-        telf_base   = ciu.telefono or ''
+        correo_base     = ciu.correo or ''
+        telf_base       = ciu.telefono or ''
         correo_contacto = ev.contacto_correo or ''
         telf_contacto   = ev.contacto_telefono or ''
         telf_inconser   = ev.contacto_telefono_inconcer or ''
+
+        # --- Reconstruir N1..N6 desde ev.categoria ---
         n1 = n2 = n3 = n4 = n5 = n6 = ''
         nivel_final = 'Sin categoría'
         if ev.categoria:
@@ -473,6 +460,67 @@ def exportar_excel(request):
                     nivel_final = f"Nivel {k}"
                     break
 
+        # --- Encuesta de satisfacción (misma fila) ---
+        encuesta = (
+            Encuesta.objects
+            .filter(evaluacion=ev)
+            .order_by('-fecha_creacion')
+            .first()
+        )
+
+        enc_estado = 'Pendiente'
+        enc_resp_en = ''
+        enc_token = ''
+        enc_url = ''
+        enc_prom_escala = ''
+        enc_respuestas_txt = ''
+
+        if encuesta:
+            try:
+                if getattr(encuesta, 'cerrada', False):
+                    enc_estado = 'Cerrada'
+                    if getattr(encuesta, 'expirada', False):
+                        enc_estado = 'Expirada'
+                else:
+                    has_resp = RespuestaEncuesta.objects.filter(encuesta=encuesta).exists()
+                    enc_estado = 'Respondida' if has_resp else 'Pendiente'
+            except Exception:
+                has_resp = RespuestaEncuesta.objects.filter(encuesta=encuesta).exists()
+                enc_estado = 'Respondida' if has_resp else 'Pendiente'
+
+            if hasattr(encuesta, 'respondida_en') and getattr(encuesta, 'respondida_en'):
+                enc_resp_en = localtime(encuesta.respondida_en).strftime('%Y-%m-%d %H:%M')
+
+            enc_token = encuesta.token or ''
+            try:
+                enc_url = request.build_absolute_uri(
+                    reverse('encuesta_publica', kwargs={'token': encuesta.token})
+                )
+            except Exception:
+                enc_url = ''
+
+            respuestas = (
+                RespuestaEncuesta.objects
+                .filter(encuesta=encuesta)
+                .select_related('pregunta')
+                .order_by('pregunta_id')
+            )
+
+            escala_vals = []
+            txt_pairs = []
+            for r in respuestas:
+                ptxt = getattr(r.pregunta, 'texto', f'Pregunta {r.pregunta_id}') if hasattr(r, 'pregunta') else f'Pregunta {r.pregunta_id}'
+                txt_pairs.append(f"{ptxt}: {r.valor}")
+                try:
+                    if getattr(r.pregunta, 'tipo', '') == 'escala' and str(r.valor).isdigit():
+                        escala_vals.append(int(r.valor))
+                except Exception:
+                    pass
+
+            if escala_vals:
+                enc_prom_escala = round(sum(escala_vals) / len(escala_vals), 2)
+            enc_respuestas_txt = " | ".join(txt_pairs) if txt_pairs else ''
+
         data = [
             localtime(ev.fecha).strftime('%Y-%m-%d %H:%M'),
             ciu.tipo_identificacion.nombre,
@@ -488,23 +536,20 @@ def exportar_excel(request):
             ciu.direccion_residencia or '',
             ev.conversacion_id,
 
-            ev.tipo_canal.nombre if ev.tipo_canal else '',
-            ev.segmento.nombre if ev.segmento else '',
-            ev.segmento_ii.nombre if ev.segmento_ii else '',
-            ev.segmento_iii.nombre if ev.segmento_iii else '',
-            ev.segmento_iv.nombre if ev.segmento_iv else '',
-            ev.segmento_v.nombre if ev.segmento_v else '',
-            ev.segmento_vi.nombre if ev.segmento_vi else '',
-
-            ev.tipificacion.nombre if ev.tipificacion else '',
-
+            # N1..N6 + Final
             n1, n2, n3, n4, n5, n6, nivel_final,
+
+            # Encuesta (misma fila)
+            enc_estado, enc_resp_en, enc_token, enc_url,
+            enc_prom_escala, enc_respuestas_txt,
+
             ev.observacion,
             ev.user.username
         ]
         for col, value in enumerate(data, 1):
             ws.cell(row=row_idx, column=col, value=xl_safe(value))
 
+    # Autosize básico
     col_widths = [len(h) + 2 for h in headers]
     for r in ws.iter_rows(min_row=2, max_row=ws.max_row, max_col=len(headers)):
         for i, cell in enumerate(r):
@@ -528,9 +573,8 @@ def exportar_excel(request):
         buffer,
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-    resp['Content-Disposition'] = 'attachment; filename="reportes_tipificaciones.xlsx"'
+    resp['Content-Disposition'] = 'attachment; filename="reportes_niveles_encuesta.xlsx"'
     return resp
-
 
 @csrf_exempt   
 def encuesta_publica(request, token):

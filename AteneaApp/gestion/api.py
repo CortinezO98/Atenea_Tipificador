@@ -1,5 +1,6 @@
 from django.http import JsonResponse
 from .models import *
+from django.views.decorators.http import require_GET
 
 def ciudadano(request):
     numero_identificacion = request.GET.get('numero_identificacion')
@@ -237,3 +238,28 @@ def subcategorias_v(request):
         return JsonResponse({'error': 'categoria_padre_id requerido'}, status=400)
     data = Categoria.objects.filter(categoria_padre_id=categoria_padre_id, nivel=5).values('id','nombre').order_by('nombre')
     return JsonResponse(list(data), safe=False)
+
+@require_GET
+def niveles(request):
+    """
+    Devuelve categorías por nivel (1..6) y, si nivel>1, opcionalmente por padre.
+    GET /api/niveles/?nivel=1
+    GET /api/niveles/?nivel=2&padre_id=123
+    """
+    try:
+        nivel = int(request.GET.get('nivel', '0'))
+    except ValueError:
+        return JsonResponse({'error': 'nivel inválido'}, status=400)
+
+    if nivel < 1 or nivel > 6:
+        return JsonResponse({'error': 'nivel debe estar entre 1 y 6'}, status=400)
+
+    padre_id = request.GET.get('padre_id')
+    flt = {'nivel': nivel}
+    if nivel > 1:
+        if not padre_id:
+            return JsonResponse({'error': 'padre_id requerido para nivel > 1'}, status=400)
+        flt['categoria_padre_id'] = padre_id
+
+    data = list(Categoria.objects.filter(**flt).values('id', 'nombre').order_by('nombre'))
+    return JsonResponse(data, safe=False)

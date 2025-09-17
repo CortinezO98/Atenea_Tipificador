@@ -139,137 +139,40 @@
           </div>
         </div>
 
-        <!-- Tarjeta de Tipificación -->
+        <!-- Tarjeta de Niveles -->
         <div class="card shadow mb-4">
           <div class="card-header bg-info text-white">
-            <h3 class="h5 mb-0"><i class="bi bi-diagram-3 me-2"></i>Proceso de Tipificación</h3>
+            <h3 class="h5 mb-0"><i class="bi bi-diagram-3 me-2"></i>Niveles</h3>
           </div>
           <div class="card-body">
             <div class="row g-3">
-              <!-- Tipo de Canal -->
-              <div class="col-md-6">
-                <label for="tipo_canal" class="form-label">
-                  <i class="bi bi-broadcast me-1"></i>Tipo de Canal
-                  <span class="text-danger">*</span>
-                </label>
-                <select name="tipo_canal" id="tipo_canal" class="form-select" required>
-                  <option value="" selected disabled>Seleccione un tipo de canal...</option>
-                  {% for tipo in tipos_canal %}
-                    <option value="{{ tipo.id }}">{{ tipo.nombre }}</option>
-                  {% endfor %}
-                </select>
-              </div>
 
-              <!-- Segmento -->
-              <div class="col-md-6">
-                <label for="segmento" class="form-label">
-                  <i class="bi bi-diagram-2 me-1"></i>Segmento
-                  <span class="text-danger">*</span>
-                </label>
-                <select name="segmento" id="segmento" class="form-select" required>
-                  <option value="" selected disabled>Seleccione un segmento...</option>
-                </select>
+              <!-- === NIVELES (únicamente) === -->
+              <div class="col-md-4">
+                <label for="nivel1" class="form-label"><i class="bi bi-list-nested me-1"></i>Nivel 1 <span class="text-danger">*</span></label>
+                <select id="nivel1" name="nivel1" class="form-select" required></select>
               </div>
-
-              <!-- Segmento II (condicional) -->
-              <div class="col-md-6" id="segmento_ii_container" style="display:none;">
-                <label for="segmento_ii" class="form-label">
-                  <i class="bi bi-diagram-3 me-1"></i>Segmento II
-                  <span class="text-danger">*</span>
-                </label>
-                <select name="segmento_ii" id="segmento_ii" class="form-select">
-                  <option value="" selected disabled>Seleccione un segmento II...</option>
-                </select>
+              <div class="col-md-4">
+                <label for="nivel2" class="form-label">Nivel 2</label>
+                <select id="nivel2" name="nivel2" class="form-select"></select>
               </div>
-
-              <!-- Segmento III (condicional) -->
-              <div class="col-md-6" id="segmento_iii_container" style="display:none;">
-                <label for="segmento_iii" class="form-label">
-                  <i class="bi bi-diagram-3-fill me-1"></i>Segmento III
-                  <span class="text-danger">*</span>
-                </label>
-                <select name="segmento_iii" id="segmento_iii" class="form-select">
-                  <option value="" selected disabled>Seleccione un segmento III...</option>
-                </select>
+              <div class="col-md-4">
+                <label for="nivel3" class="form-label">Nivel 3</label>
+                <select id="nivel3" name="nivel3" class="form-select"></select>
               </div>
-
-              <!-- Tipificación -->
-              <div class="col-md-6">
-                <label for="tipificacion" class="form-label">
-                  <i class="bi bi-tag me-1"></i>Tipificación
-                  <span class="text-danger">*</span>
-                </label>
-                <select name="tipificacion" id="tipificacion" class="form-select" required>
-                  <option value="" selected disabled>Seleccione una tipificación...</option>
-                </select>
+              <div class="col-md-4">
+                <label for="nivel4" class="form-label">Nivel 4</label>
+                <select id="nivel4" name="nivel4" class="form-select"></select>
               </div>
-
-              <!-- Categoría (Nivel 1) -->
-              <div class="col-md-6">
-                <label for="categoria" class="form-label">
-                  <i class="bi bi-menu-button me-1"></i>Categoría
-                  <span class="text-muted small" id="categoria_optional_label" style="display:none;">(Opcional)</span>
-                  <span class="text-danger" id="categoria_required_label">*</span>
-                </label>
-                <select name="categoria" id="categoria" class="form-select" required>
-                  <option value="" selected disabled>Selecciona una categoría</option>
-                </select>
+              <div class="col-md-4">
+                <label for="nivel5" class="form-label">Nivel 5</label>
+                <select id="nivel5" name="nivel5" class="form-select"></select>
               </div>
-
-              <!-- Subcategoría (Nivel 2) -->
-              <div class="col-md-6" id="subcategoria_container" style="display:none;">
-                <label for="subcategoria" class="form-label">
-                  <i class="bi bi-menu-button-wide me-1"></i>Sub Categoría
-                  <span class="text-danger">*</span>
-                </label>
-                <select name="subcategoria" id="subcategoria" class="form-select">
-                  <option value="" selected disabled>Selecciona una sub categoría</option>
-                </select>
+              <div class="col-md-4">
+                <label for="nivel6" class="form-label">Nivel 6</label>
+                <select id="nivel6" name="nivel6" class="form-select"></select>
               </div>
-
-              <!-- Sub Categoría II (Nivel 3) -->
-              <div class="col-md-6" id="subcategoria_ii_container" style="display:none;">
-                <label for="subcategoria_ii" class="form-label">
-                  <i class="bi bi-menu-button-wide-fill me-1"></i>Sub Categoría II
-                  <span class="text-danger">*</span>
-                </label>
-                <select name="subcategoria_ii" id="subcategoria_ii" class="form-select">
-                  <option value="" selected disabled>Selecciona una sub categoría II</option>
-                </select>
-              </div>
-
-              <!-- Sub Categoría III (Nivel 4) -->
-              <div class="col-md-6" id="subcategoria_iii_container" style="display:none;">
-                <label for="subcategoria_iii" class="form-label">
-                  <i class="bi bi-menu-button-wide-fill me-1"></i>Sub Categoría III
-                  <span class="text-danger">*</span>
-                </label>
-                <select name="subcategoria_iii" id="subcategoria_iii" class="form-select">
-                  <option value="" selected disabled>Selecciona una sub categoría III</option>
-                </select>
-              </div>
-
-              <!-- Sub Categoría IV (Nivel 5) -->
-              <div class="col-md-6" id="subcategoria_iv_container" style="display:none;">
-                <label for="subcategoria_iv" class="form-label">
-                  <i class="bi bi-menu-button-wide-fill me-1"></i>Sub Categoría IV
-                  <span class="text-danger">*</span>
-                </label>
-                <select name="subcategoria_iv" id="subcategoria_iv" class="form-select">
-                  <option value="" selected disabled>Selecciona una sub categoría IV</option>
-                </select>
-              </div>
-
-              <!-- Sub Categoría V (Nivel 6) -->
-              <div class="col-md-6" id="subcategoria_v_container" style="display:none;">
-                <label for="subcategoria_v" class="form-label">
-                  <i class="bi bi-menu-button-wide-fill me-1"></i>Sub Categoría V
-                  <span class="text-danger">*</span>
-                </label>
-                <select name="subcategoria_v" id="subcategoria_v" class="form-select">
-                  <option value="" selected disabled>Selecciona una sub categoría V</option>
-                </select>
-              </div>
+              <!-- === /NIVELES === -->
 
               <!-- Observaciones -->
               <div class="col-12">
@@ -308,17 +211,6 @@ $(document).ready(function () {
     '#direccion_residencia', '#pais', '#ciudad'
   ];
 
-  // Mapa dinámico de niveles de categorías hasta 6
-  // nivel: {container, select, endpoint}
-  const nivelesCategorias = {
-    1: { sel: '#categoria',        cont: null,                         endpoint: '/api/categorias/' },
-    2: { sel: '#subcategoria',     cont: '#subcategoria_container',    endpoint: '/api/subcategorias/' },
-    3: { sel: '#subcategoria_ii',  cont: '#subcategoria_ii_container', endpoint: '/api/subcategorias-ii/' },
-    4: { sel: '#subcategoria_iii', cont: '#subcategoria_iii_container',endpoint: '/api/subcategorias-iii/' },
-    5: { sel: '#subcategoria_iv',  cont: '#subcategoria_iv_container', endpoint: '/api/subcategorias-iv/' }, // opcional
-    6: { sel: '#subcategoria_v',   cont: '#subcategoria_v_container',  endpoint: '/api/subcategorias-v/' }   // opcional
-  };
-
   // ==================== AUXILIARES ====================
   function mostrarMensaje(mensaje, tipo = "warning") {
     Swal.fire({
@@ -333,24 +225,7 @@ $(document).ready(function () {
     $(selector).empty().append(`<option value="" disabled selected>${placeholder}</option>`);
   }
 
-  function toggleContainer(containerId, show = true) {
-    if (!containerId) return;
-    const $c = $(containerId);
-    if (show) {
-      $c.show().removeClass('d-none');
-    } else {
-      $c.hide().addClass('d-none');
-      $c.find('select, input').prop('required', false);
-    }
-  }
-
-  function isOtrosDelitosLabel(texto) {
-    const t = (texto || '').toUpperCase();
-    return t.includes('OTROS DELITOS') || t.includes('OTRO DELITO') || t.includes('OTROS DELITO')
-        || t.includes('OTRO DELITOS') || t === 'OTRO' || t === 'OTROS';
-  }
-
-  // ==================== BLOQUEO DE CAMPOS ====================
+  // ==================== BLOQUEO DE CAMPOS (ciudadano) ====================
   function bloquearCamposCiudadano(bloquear = true) {
     camposCiudadano.forEach(function (campo) {
       const $el = $(campo);
@@ -443,7 +318,7 @@ $(document).ready(function () {
     }).then((r) => { if (r.isConfirmed) limpiarBusquedaCiudadano(); });
   });
 
-  // ==================== PREGUNTAS ADICIONALES ====================
+  // ==================== PREGUNTAS ADICIONALES (si existen en tu template) ====================
   $('input[name="se_comunica_uri"]').on('change', function () {
     const si = $(this).val() === '1';
     const $cont = $('#ciudad_municipio_container');
@@ -470,17 +345,6 @@ $(document).ready(function () {
         $sel.prop('required', false).val('');
       });
     }
-  });
-
-  // ==================== CARGA INICIAL ====================
-  $.ajax({
-    url: '/api/tipificaciones/',
-    method: 'GET',
-    success: function (response) {
-      limpiarSelect('#tipificacion', 'Seleccione una tipificación...');
-      response.forEach(t => $('#tipificacion').append(`<option value="${t.id}">${t.nombre}</option>`));
-    },
-    error: function () { mostrarMensaje('Error al cargar tipificaciones'); }
   });
 
   // ==================== BÚSQUEDA DE CIUDADANO ====================
@@ -533,289 +397,73 @@ $(document).ready(function () {
     });
   });
 
-  // ==================== JERARQUÍA DE SEGMENTOS ====================
-  $('#tipo_canal').on('change', function () {
-    const tipoCanal = $(this).val();
-    if (!tipoCanal) return;
-
-    limpiarSelect('#segmento', 'Cargando segmentos...');
-    limpiarSelect('#segmento_ii', 'Seleccione un segmento II...');
-    limpiarSelect('#segmento_iii', 'Seleccione un segmento III...');
-    toggleContainer('#segmento_ii_container', false);
-    toggleContainer('#segmento_iii_container', false);
-
-    // Limpiar categorías al cambiar canal
-    resetCategoriasDesdeNivel(1);
-
-    $.ajax({
-      url: '/api/segmentos/',
-      method: 'GET',
-      data: { tipo_canal_id: tipoCanal },
-      success: function (response) {
-        limpiarSelect('#segmento', 'Seleccione un segmento...');
-        if (response.length > 0) {
-          response.forEach(seg => {
-            $('#segmento').append(
-              `<option value="${seg.id}" data-tiene-segmento-ii="${seg.tiene_segmento_ii}">${seg.nombre}</option>`
-            );
-          });
-        } else {
-          mostrarMensaje('El tipo de canal seleccionado no tiene segmentos disponibles.');
-        }
-      },
-      error: function () { mostrarMensaje('Error al cargar segmentos.'); }
-    });
-  });
-
-  $('#segmento').on('change', function () {
-    const segmentoId = $(this).val();
-    const tieneII = String($(this).find('option:selected').data('tiene-segmento-ii')) === 'true';
-
-    limpiarSelect('#segmento_ii', 'Seleccione un segmento II...');
-    limpiarSelect('#segmento_iii', 'Seleccione un segmento III...');
-    toggleContainer('#segmento_ii_container', false);
-    toggleContainer('#segmento_iii_container', false);
-    $('#segmento_ii').prop('required', false);
-    $('#segmento_iii').prop('required', false);
-
-    // Limpiar categorías al cambiar segmento
-    resetCategoriasDesdeNivel(1);
-
-    if (tieneII) {
-      toggleContainer('#segmento_ii_container', true);
-      $('#segmento_ii').prop('required', true);
-      $.ajax({
-        url: '/api/segmentos-ii/',
-        method: 'GET',
-        data: { segmento_id: segmentoId },
-        success: function (response) {
-          limpiarSelect('#segmento_ii', 'Seleccione un segmento II...');
-          if (response.length > 0) {
-            response.forEach(s2 => $('#segmento_ii').append(`<option value="${s2.id}">${s2.nombre}</option>`));
-          } else {
-            mostrarMensaje('El segmento seleccionado no tiene segmentos II disponibles.');
-          }
-        },
-        error: function () { mostrarMensaje('Error al cargar segmentos II.'); }
-      });
+  // ==================== NIVELES (N1..N6) ====================
+  function limpiarSelectConPlaceholder($sel, placeholder) {
+    $sel.empty().append(`<option value="" selected disabled>${placeholder}</option>`);
+  }
+  function fillSelect($sel, items, placeholder) {
+    limpiarSelectConPlaceholder($sel, placeholder);
+    (items || []).forEach(it => $sel.append(`<option value="${it.id}">${it.nombre}</option>`));
+  }
+  async function fetchNiveles(nivel, padreId=null) {
+    const params = new URLSearchParams({ nivel: String(nivel) });
+    if (nivel > 1 && padreId) params.set('padre_id', padreId);
+    const res = await fetch(`/api/niveles/?${params.toString()}`);
+    if (!res.ok) return [];
+    return res.json();
+  }
+  function resetNivelesDesde(desde) {
+    for (let n = desde; n <= 6; n++) {
+      const $s = $(`#nivel${n}`);
+      fillSelect($s, [], `Seleccione Nivel ${n}...`);
+      $s.prop('required', n === 1);
     }
-  });
-
-  $('#segmento_ii').on('change', function () {
-    const segII = $(this).val();
-    limpiarSelect('#segmento_iii', 'Seleccione un segmento III...');
-    toggleContainer('#segmento_iii_container', false);
-    $('#segmento_iii').prop('required', false);
-
-    if (!segII) return;
-
-    $.ajax({
-      url: '/api/segmentos-iii/',
-      method: 'GET',
-      data: { segmento_ii_id: segII },
-      success: function (response) {
-        if (response.length > 0) {
-          toggleContainer('#segmento_iii_container', true);
-          $('#segmento_iii').prop('required', true);
-          limpiarSelect('#segmento_iii', 'Seleccione un segmento III...');
-          response.forEach(s3 => $('#segmento_iii').append(`<option value="${s3.id}">${s3.nombre}</option>`));
-          Swal.fire({ title:'Opciones adicionales disponibles', text:`Se encontraron ${response.length} opciones de Segmento III.`, icon:'info', timer:2000, showConfirmButton:false, toast:true, position:'top-end' });
-        } else {
-          setTimeout(() => { $('#tipificacion').focus(); }, 300);
-        }
-      },
-      error: function () {
-        setTimeout(() => { $('#tipificacion').focus(); }, 300);
-      }
-    });
-  });
-
-  $('#segmento_iii').on('change', function () {
-    const t = $(this).find('option:selected').text();
-    Swal.fire({ title:'Selección completada', text:`${t} seleccionado. Continúe con la tipificación.`, icon:'success', timer:2000, showConfirmButton:false, toast:true, position:'top-end' });
-    setTimeout(() => { $('#tipificacion').focus(); }, 500);
-  });
-
-  // ==================== JERARQUÍA DE CATEGORÍAS (hasta 6 niveles) ====================
-  function resetCategoriasDesdeNivel(nivel) {
-    // Oculta y limpia todos los niveles >= nivel
-    for (let i = nivel; i <= 6; i++) {
-      const meta = nivelesCategorias[i];
-      if (!meta) continue;
-      limpiarSelect(meta.sel, 'Selecciona una opción');
-      if (meta.cont) toggleContainer(meta.cont, false);
-      $(meta.sel).prop('required', i === 1); // Solo nivel 1 requerido por defecto
-    }
-    // Campos especiales
-    toggleContainer('#otros_delitos_container', false);
-    $('#cual_otro_delito').prop('required', false).val('');
+  }
+  async function cargarNivel1() {
+    const data = await fetchNiveles(1);
+    fillSelect($('#nivel1'), data, 'Seleccione Nivel 1...');
+  }
+  async function cargarHijos(nivelHijo, padreId) {
+    resetNivelesDesde(nivelHijo);
+    if (!padreId) return;
+    const data = await fetchNiveles(nivelHijo, padreId);
+    fillSelect($(`#nivel${nivelHijo}`), data, `Seleccione Nivel ${nivelHijo}...`);
+    $(`#nivel${nivelHijo}`).prop('required', data.length > 0);
   }
 
-  $('#tipificacion').on('change', function () {
-    const tipId = $(this).val();
-    if (!tipId) return;
-    resetCategoriasDesdeNivel(1);
-
-    // Nivel 1 (categoría)
-    $.ajax({
-      url: nivelesCategorias[1].endpoint,
-      method: 'GET',
-      data: { tipificacion_id: tipId },
-      success: function (res) {
-        if (res.length > 0) {
-          limpiarSelect('#categoria', 'Selecciona una categoría');
-          res.forEach(cat => $('#categoria').append(`<option value="${cat.id}">${cat.nombre}</option>`));
-          $('#categoria').prop('required', true);
-          $('#categoria_optional_label').hide();
-          $('#categoria_required_label').show();
-          Swal.fire({ title:'Categorías cargadas', text:`Se encontraron ${res.length} categoría(s).`, icon:'success', timer:2000, showConfirmButton:false, toast:true, position:'top-end' });
-        } else {
-          limpiarSelect('#categoria', 'Sin categorías - Tipificación directa');
-          $('#categoria').prop('required', false);
-          $('#categoria_optional_label').show();
-          $('#categoria_required_label').hide();
-          $('#categoria').append('<option value="0" selected>Sin categoría específica</option>');
-          Swal.fire({ title:'Tipificación directa', text:'Esta tipificación no requiere selección de categoría.', icon:'info', timer:3000, showConfirmButton:false, toast:true, position:'top-end' });
-        }
-      },
-      error: function () { mostrarMensaje('Error al cargar categorías.'); }
-    });
-  });
-
-  // Handler genérico para cambio en cualquier nivel de categoría (1..5) para cargar el siguiente
-  function onCambioNivelCategoria(nivelActual) {
-    const metaActual = nivelesCategorias[nivelActual];
-    const metaSiguiente = nivelesCategorias[nivelActual + 1];
-    const $selActual = $(metaActual.sel);
-    const idSel = $selActual.val();
-    const textoSel = $selActual.find('option:selected').text() || '';
-
-    // Otros delitos
-    if (nivelActual <= 2) { // chequeamos en nivel 1 y 2 como en el original
-      if (isOtrosDelitosLabel(textoSel)) {
-        toggleContainer('#otros_delitos_container', true);
-        $('#cual_otro_delito').prop('required', true);
-      } else {
-        toggleContainer('#otros_delitos_container', false);
-        $('#cual_otro_delito').prop('required', false).val('');
-      }
-    }
-
-    // Limpiar niveles siguientes
-    resetCategoriasDesdeNivel(nivelActual + 1);
-
-    if (!metaSiguiente || !idSel) return; // no hay más niveles o no hay selección
-
-    // Cargar el siguiente nivel
-    const params = (nivelActual === 1)
-      ? { categoria_padre_id: idSel } // aunque nivel 2 usa /api/subcategorias/
-      : { categoria_padre_id: idSel };
-
-    $.ajax({
-      url: metaSiguiente.endpoint,
-      method: 'GET',
-      data: params,
-      success: function (res) {
-        if (Array.isArray(res) && res.length > 0) {
-          limpiarSelect(metaSiguiente.sel, 'Selecciona una opción');
-          res.forEach(item => $(metaSiguiente.sel).append(`<option value="${item.id}">${item.nombre}</option>`));
-          if (metaSiguiente.cont) toggleContainer(metaSiguiente.cont, true);
-          $(metaSiguiente.sel).prop('required', true);
-
-          // Mensajes informativos para algunos flujos conocidos (opcional)
-          if (nivelActual === 2 && (idSel === '1037' || idSel === '1068')) {
-            Swal.fire({ title:'Sub Categorías II cargadas', text:`Se encontraron ${res.length} opciones.`, icon:'info', timer:2000, showConfirmButton:false, toast:true, position:'top-end' });
-          }
-        }
-      },
-      error: function () {
-        // Si el endpoint no existe (niveles 5/6 opcionales), simplemente no mostramos nada.
-      }
-    });
-  }
-
-  // Enlazar cambios de niveles 1..5
-  $('#categoria').on('change', function () { onCambioNivelCategoria(1); });
-  $('#subcategoria').on('change', function () { onCambioNivelCategoria(2); });
-  $('#subcategoria_ii').on('change', function () {
-    const texto = $(this).find('option:selected').text().toUpperCase();
-    // Mantener compat con flujo NNA / ADULTO del original
-    if (texto === 'NNA') {
-      toggleContainer('#subcategoria_iii_container', false);
-      $('#subcategoria_iii').prop('required', false);
-      Swal.fire({ title:'Flujo NNA', text:'Puede proceder directamente a observaciones.', icon:'success', timer:2000, showConfirmButton:false, toast:true, position:'top-end' });
-      setTimeout(() => { $('#observacion').focus(); }, 500);
-      // Aún así, intentamos niveles siguientes si existen (para generalidad)
-      onCambioNivelCategoria(3);
-      return;
-    }
-    if (texto === 'ADULTO') {
-      // Cargar nivel 4 y continuar
-      onCambioNivelCategoria(3);
-      return;
-    }
-    onCambioNivelCategoria(3);
-  });
-  $('#subcategoria_iii').on('change', function () { onCambioNivelCategoria(4); });
-  $('#subcategoria_iv').on('change', function () { onCambioNivelCategoria(5); });
-
-  // Cuando llega al último nivel
-  $('#subcategoria_v').on('change', function () {
-    const t = $(this).find('option:selected').text();
-    Swal.fire({ title:'Flujo completado', text:`${t} seleccionado. Puede proceder a observaciones.`, icon:'success', timer:2000, showConfirmButton:false, toast:true, position:'top-end' });
-    setTimeout(() => { $('#observacion').focus(); }, 500);
-  });
+  // Encadenar niveles
+  $('#nivel1').on('change', function(){ cargarHijos(2, $(this).val()); });
+  $('#nivel2').on('change', function(){ cargarHijos(3, $(this).val()); });
+  $('#nivel3').on('change', function(){ cargarHijos(4, $(this).val()); });
+  $('#nivel4').on('change', function(){ cargarHijos(5, $(this).val()); });
+  $('#nivel5').on('change', function(){ cargarHijos(6, $(this).val()); });
 
   // ==================== VALIDACIONES ====================
   $('form').on('submit', function (e) {
-    // Requeridos base
-    const tipoCanal = $('#tipo_canal').val();
-    const segmento  = $('#segmento').val();
-    const tipif     = $('#tipificacion').val();
-    if (!tipoCanal || !segmento || !tipif) {
-      e.preventDefault(); mostrarMensaje('Por favor complete los campos de tipificación requeridos.'); return false;
+    // Niveles: N1 siempre requerido
+    if (!$('#nivel1').val()) {
+      e.preventDefault(); mostrarMensaje('Por favor seleccione el Nivel 1.'); $('#nivel1').focus(); return false;
     }
 
-    // Categoría (nivel 1) si es requerida
-    const catReq = $('#categoria').prop('required');
-    if (catReq && !$('#categoria').val()) {
-      e.preventDefault(); mostrarMensaje('Por favor seleccione una categoría.'); return false;
-    }
-
-    // Segmentos condicionales
-    if ($('#segmento_ii_container').is(':visible') && $('#segmento_ii').prop('required') && !$('#segmento_ii').val()) {
-      e.preventDefault(); mostrarMensaje('Por favor seleccione un Segmento II.'); return false;
-    }
-    if ($('#segmento_iii_container').is(':visible') && $('#segmento_iii').prop('required') && !$('#segmento_iii').val()) {
-      e.preventDefault(); mostrarMensaje('Por favor seleccione un Segmento III.'); return false;
-    }
-
-    // Validar dinámicamente niveles de categorías visibles y requeridos (2..6)
+    // Si un nivel tiene opciones (más del placeholder), exigir selección antes de seguir
     for (let n = 2; n <= 6; n++) {
-      const meta = nivelesCategorias[n];
-      if (!meta) continue;
-      const visible = meta.cont ? $(meta.cont).is(':visible') : true;
-      if (visible && $(meta.sel).prop('required') && !$(meta.sel).val()) {
+      const $s = $(`#nivel${n}`);
+      const tieneOpciones = $s.find('option').length > 1;
+      if (tieneOpciones && !$s.val()) {
         e.preventDefault();
-        mostrarMensaje(`Por favor seleccione una opción en ${$(meta.sel).prev('label').text().trim()}.`);
-        $(meta.sel).focus();
+        mostrarMensaje(`Por favor seleccione el Nivel ${n}.`);
+        $s.focus();
         return false;
       }
     }
 
-    // "¿Cuál otro delito?"
-    if ($('#otros_delitos_container').is(':visible') && $('#cual_otro_delito').prop('required')) {
-      const v = $('#cual_otro_delito').val().trim();
-      if (!v) { e.preventDefault(); mostrarMensaje('Por favor especifique cuál es el otro delito.'); $('#cual_otro_delito').focus(); return false; }
-    }
-
-    // Preguntas adicionales
+    // Preguntas adicionales (solo si existen en el DOM)
     const uriSel = $('input[name="se_comunica_uri"]:checked').val();
-    if (uriSel === '1' && !$('#ciudad_municipio_uri').val().trim()) {
+    if (uriSel === '1' && $('#ciudad_municipio_uri').length && !$('#ciudad_municipio_uri').val().trim()) {
       e.preventDefault(); mostrarMensaje('Por favor indique la ciudad/municipio de la URI.'); $('#ciudad_municipio_uri').focus(); return false;
     }
     const cj = $('input[name="consulta_juridica"]:checked').val();
-    if (cj === '1' && !$('#abogado').val()) {
+    if (cj === '1' && $('#abogado').length && !$('#abogado').val()) {
       e.preventDefault(); mostrarMensaje('Por favor seleccione un abogado para la consulta jurídica.'); $('#abogado').focus(); return false;
     }
 
@@ -838,7 +486,7 @@ $(document).ready(function () {
     return true;
   });
 
-  // Re–deshabilitar selects bloqueados tras envío
+  // Re–deshabilitar selects bloqueados tras envío (si hubo desbloqueo temporal)
   $('form').on('submit', function () {
     setTimeout(function () {
       $('.temp-enabled-for-submit').each(function () {
@@ -851,7 +499,7 @@ $(document).ready(function () {
   function limpiarFormularioCompleto() {
     limpiarBusquedaCiudadano();
 
-    // Preguntas adicionales
+    // Preguntas adicionales (si existen)
     $('input[name="se_comunica_uri"]').prop('checked', false);
     $('input[name="consulta_juridica"]').prop('checked', false);
     $('#ciudad_municipio_container').hide();
@@ -859,28 +507,20 @@ $(document).ready(function () {
     $('#ciudad_municipio_uri').prop('required', false).val('');
     $('#abogado').prop('required', false).val('');
 
-    // Reset categorías desde nivel 1
-    resetCategoriasDesdeNivel(1);
-
-    // Reset segmentos
-    limpiarSelect('#tipo_canal', 'Seleccione un tipo de canal...');
-    limpiarSelect('#segmento', 'Seleccione un segmento...');
-    limpiarSelect('#segmento_ii', 'Seleccione un segmento II...');
-    limpiarSelect('#segmento_iii', 'Seleccione un segmento III...');
-    toggleContainer('#segmento_ii_container', false);
-    toggleContainer('#segmento_iii_container', false);
+    // Reset niveles desde N1
+    resetNivelesDesde(1);
+    cargarNivel1();
 
     // Otros
     $('#conversacion_id').val('');
     $('#observacion').val('');
-    $('#cual_otro_delito').val('');
   }
 
   $('#btn_limpiar, button[type="reset"]').on('click', function (e) {
     e.preventDefault();
     Swal.fire({
       title: '¿Limpiar formulario?',
-      text: 'Se perderán todos los datos ingresados incluyendo las sub categorías.',
+      text: 'Se perderán todos los datos ingresados.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Sí, limpiar todo',
@@ -893,24 +533,11 @@ $(document).ready(function () {
     });
   });
 
-  // ==================== EXTRAS UI ====================
-  $(document).on('keydown', '.campo-bloqueado', function (e) {
-    const ok = [9,16,17,18,27,37,38,39,40].includes(e.keyCode);
-    if (!ok) { e.preventDefault(); return false; }
-  });
-  $(document).on('mousedown', 'select.campo-bloqueado', function (e) { e.preventDefault(); return false; });
-  $(document).on('mouseenter', '.campo-bloqueado', function () { $(this).attr('title', 'Campo bloqueado - Ciudadano existente'); });
-
-  $('#conversacion_id').on('input', function () {
-    const v = $(this).val();
-    const ok = v.length >= 5;
-    $(this).toggleClass('is-invalid', !ok && v.length > 0);
-    $(this).toggleClass('is-valid', ok);
-  });
-
   // ==================== INICIALIZACIÓN ====================
   $('#numero_identificacion').focus();
   actualizarEstadoCiudadano(false);
+  // Cargar N1 al iniciar
+  cargarNivel1();
 });
 </script>
 

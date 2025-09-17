@@ -3,30 +3,35 @@
 tiposCanal = [
     {
         "id": 1,
-        "nombre": "CHAT"
+        "nombre": "SICORE"
     },
     {
         "id": 2,
-        "nombre": "SMS"
+        "nombre": "PROGRAMAS"
     },
     {
         "id": 3,
-        "nombre": "INBOUND"
+        "nombre": "FONDOS"
     },
     {
         "id": 4,
-        "nombre": "OUTBOUND"
+        "nombre": "CIENCIA, TECNOLOGÍA E INNOVACIÓN"
     },
     {
         "id": 5,
-        "nombre": "VIRTUAL HOLD"
+        "nombre": "PQRS"
     },
     {
         "id": 6,
-        "nombre": "VIDEO LLAMADA"
+        "nombre": "ACADEMIA ATENEA"
     },
     {
         "id": 7,
-        "nombre": "LLAMADA VIRTUAL"
+        "nombre": "INFORMACIÓN GENERAL"
+    },
+    {
+        "id": 8,
+        "nombre": "NO EFECTIVA"
     }
+
 ]
