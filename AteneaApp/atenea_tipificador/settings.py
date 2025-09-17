@@ -32,6 +32,8 @@ DEBUG = not IN_PRODUCTION
 
 if IN_PRODUCTION:
     ALLOWED_HOSTS = [
+        '172.26.16.22',     
+        '127.0.0.1', 'localhost',
         'tipificadoratenea.ddns.net',
         'www.tipificadoratenea.ddns.net',
         '172.190.158.214',
@@ -39,6 +41,7 @@ if IN_PRODUCTION:
     ]
 
     CSRF_TRUSTED_ORIGINS = [
+        'https://172.26.16.22',
         'https://tipificadoratenea.ddns.net',
         'https://www.tipificadoratenea.ddns.net',
     ]
