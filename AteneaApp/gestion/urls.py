@@ -40,5 +40,4 @@ urlpatterns = [
 
     # ==================== ENCUESTA PÚBLICA ====================
     path('encuesta/<str:token>/', views.encuesta_publica, name='encuesta_publica'),
-    path('encuesta/gracias/', views.encuesta_gracias, name='encuesta_gracias'),
 ]

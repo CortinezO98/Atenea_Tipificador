@@ -1,0 +1,174 @@
+{% extends "usuarios/encuestas/base/base.html" %}
+
+{% block content %}
+<div class="survey-container">
+  <div class="survey-card">
+    <div class="survey-header">
+      <div class="survey-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+      </div>
+      <h1 class="survey-title">Encuesta de satisfacción</h1>
+      <p class="survey-subtitle">Evaluación #{{ encuesta.evaluacion_id }}</p>
+      <div class="progress-container">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <span class="progress-text" id="progressText">0% completado</span>
+      </div>
+    </div>
+
+    <div class="survey-body">
+      {% if error %}
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+          <strong>Error:</strong> {{ error }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endif %}
+
+      <form method="post" novalidate id="surveyForm">
+        {% csrf_token %}
+        
+        {% for p in preguntas %}
+          <div class="question-container mb-4" id="question-{{ p.id }}">
+            <div class="question-header">
+              <span class="question-number">{{ p.orden }}.</span>
+              <label class="question-text">{{ p.texto }}</label>
+              {% if p.tipo == 'escala' %}
+                <div class="scale-labels">
+                  <span>Muy insatisfecho</span>
+                  <span>Muy satisfecho</span>
+                </div>
+              {% endif %}
+            </div>
+
+            <div class="question-input">
+              {% if p.tipo == 'escala' %}
+                <div class="scale-container">
+                  <div class="scale-options">
+                    {% for v in "12345" %}
+                      {% with val=v|stringformat:"s" %}
+                        <div class="scale-option">
+                          <input type="radio" name="q_{{ p.id }}" id="q_{{ p.id }}_{{ val }}" value="{{ val }}" 
+                            {% if respuestas_previas.p|default_if_none:'' == val %}checked{% endif %} 
+                            class="scale-input" required>
+                          <label for="q_{{ p.id }}_{{ val }}" class="scale-label">
+                            <span class="scale-number">{{ val }}</span>
+                          </label>
+                        </div>
+                      {% endwith %}
+                    {% endfor %}
+                  </div>
+                </div>
+                
+              {% elif p.tipo == 'si_no' %}
+                <div class="yes-no-container">
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="q_{{ p.id }}" id="q_{{ p.id }}_si" value="Si" 
+                      {% if respuestas_previas.p|default_if_none:'' == "Si" %}checked{% endif %} required>
+                    <label class="form-check-label" for="q_{{ p.id }}_si">Sí</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="q_{{ p.id }}" id="q_{{ p.id }}_no" value="No" 
+                      {% if respuestas_previas.p|default_if_none:'' == "No" %}checked{% endif %} required>
+                    <label class="form-check-label" for="q_{{ p.id }}_no">No</label>
+                  </div>
+                </div>
+              {% endif %}
+              
+              <div class="invalid-feedback feedback-message">
+                Por favor, responde esta pregunta para continuar.
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+
+        <div class="survey-actions">
+          <button type="submit" class="btn btn-submit">
+            <span class="btn-text">Enviar encuesta</span>
+            <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('surveyForm');
+  const questions = document.querySelectorAll('.question-container');
+  const progressFill = document.getElementById('progressFill');
+  const progressText = document.getElementById('progressText');
+  const submitBtn = document.querySelector('.btn-submit');
+  const btnText = document.querySelector('.btn-text');
+  const btnSpinner = document.querySelector('.spinner-border');
+  
+  let answeredQuestions = 0;
+  
+  // Calcular progreso inicial
+  function calculateProgress() {
+    answeredQuestions = 0;
+    questions.forEach(question => {
+      const inputs = question.querySelectorAll('input:checked');
+      if (inputs.length > 0) answeredQuestions++;
+    });
+    
+    const progress = (answeredQuestions / questions.length) * 100;
+    progressFill.style.width = `${progress}%`;
+    progressText.textContent = `${Math.round(progress)}% completado`;
+  }
+  
+  // Inicializar progreso
+  calculateProgress();
+  
+  // Validación en tiempo real
+  questions.forEach(question => {
+    const inputs = question.querySelectorAll('input');
+    inputs.forEach(input => {
+      input.addEventListener('change', function() {
+        question.classList.remove('is-invalid');
+        calculateProgress();
+      });
+    });
+  });
+  
+  // Validación al enviar el formulario
+  form.addEventListener('submit', function(event) {
+    let formIsValid = true;
+    
+    questions.forEach(question => {
+      const inputs = question.querySelectorAll('input');
+      let answered = false;
+      
+      inputs.forEach(input => {
+        if (input.checked) answered = true;
+      });
+      
+      if (!answered) {
+        question.classList.add('is-invalid');
+        formIsValid = false;
+        
+        // Scroll to first error
+        if (formIsValid === false) {
+          question.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    });
+    
+    if (!formIsValid) {
+      event.preventDefault();
+      event.stopPropagation();
+    } else {
+      // Mostrar estado de carga
+      btnText.classList.add('d-none');
+      btnSpinner.classList.remove('d-none');
+      submitBtn.disabled = true;
+    }
+  });
+});
+</script>
+{% endblock %}

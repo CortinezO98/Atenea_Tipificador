@@ -6,14 +6,13 @@
 <div class="min-vh-100 d-flex justify-content-center align-items-center bg-white">
   <div class="col-md-3">
     <div class="d-flex justify-content-center align-items-center gap-3 mb-3 animate__animated animate__fadeInDown">
-      <img src="{% static 'img/logofiscalia.png' %}" alt="Logo Fiscalía" class="img-fluid" style="max-height: 70px;">
+      <img src="{% static 'img/latenea2.png' %}" alt="Logo Atenea" class="img-fluid" style="max-height: 100px;">
       <img src="{% static 'img/logo_iq.png' %}" alt="Logo IQ Outsourcing" class="img-fluid" style="max-height: 70px;">
     </div>
-    <h5 class="text-center fw-bold text-primary animate__animated animate__fadeInDown mb-4">Fiscalía General de la
-      Nación</h5>
+    <h5 class="text-center fw-bold animate__animated animate__fadeInDown mb-4" style="color: #E65A0F;">ATENEA</h5>
     <div class="card shadow-lg rounded-4 border-0 bg-light animate__animated animate__fadeInUp">
-      <div class="card-header bg-primary text-white text-center rounded-top-4">
-        <h5 class="mb-0"><i class="bi bi-person-lock me-2"></i>Inicio de Sesión</h5>
+      <div class="card-header text-white text-center rounded-top-4" style="background-color: #E65A0F;">
+        <h5 class="mb-0 text-white"><i class="bi bi-person-lock me-2"></i>Inicio de Sesión</h5>
       </div>
       <div class="card-body p-4">
         <form method="post" novalidate>
@@ -34,7 +33,7 @@
           </div>
           {% endif %}
           <div class="d-grid">
-            <button type="submit" class="btn btn-outline-primary">
+            <button type="submit" class="btn btn-outline-primary" >
               <i class="bi bi-box-arrow-in-right me-1"></i>Ingresar
             </button>
           </div>
@@ -42,7 +41,7 @@
       </div>
     </div>
     <div class="text-center mt-3">
-      <small class="text-muted">© Fiscalía General de la Nación - IQ Outsourcing - {{ now|date:"Y" }}</small>
+      <small class="text-muted">© ATENEA - IQ Outsourcing - {{ now|date:"Y" }}</small>
     </div>
   </div>
 </div>

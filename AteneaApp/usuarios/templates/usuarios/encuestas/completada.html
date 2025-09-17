@@ -1,5 +1,20 @@
-{% extends "base.html" %}
+{% extends "usuarios/encuestas/base/base.html" %}
+
 {% block content %}
-<h2>Encuesta ya respondida</h2>
-<p>Gracias. Ya registramos una respuesta para este enlace.</p>
+<div class="status-container">
+  <div class="status-card completed">
+    <div class="status-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+        <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+      </svg>
+    </div>
+    <h2 class="status-title">Encuesta completada</h2>
+    <p class="status-message">Ya hemos registrado tu respuesta anteriormente. Agradecemos tu participación.</p>
+    <p class="text-muted">Cada opinión cuenta para mejorar nuestros servicios.</p>
+    <div class="status-actions">
+      <a href="/" class="btn btn-primary">Volver al inicio</a>
+    </div>
+  </div>
+</div>
 {% endblock %}

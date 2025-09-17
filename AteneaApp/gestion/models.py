@@ -168,8 +168,7 @@ class Tipificacion(models.Model):
 
 class Categoria(models.Model):
     """
-    Árbol de categorías hasta nivel 6:
-    nivel=1 (raíz), 2, 3, 4, 5, 6 (terminal)
+    Árbol de categorías hasta nivel 6: nivel=1 (raíz) … nivel=6 (terminal).
     """
     nombre = models.CharField(max_length=200)
     nivel = models.IntegerField(default=1, db_index=True)
@@ -180,6 +179,11 @@ class Categoria(models.Model):
         verbose_name = "Categoria"
         verbose_name_plural = "Categorias"
         ordering = ['nombre']
+        indexes = [
+            models.Index(fields=['nivel']),
+            models.Index(fields=['tipificacion', 'nivel']),
+            models.Index(fields=['categoria_padre']),
+        ]
 
     def __str__(self):
         if self.tipificacion:
@@ -208,7 +212,7 @@ class Evaluacion(models.Model):
     segmento_vi = models.ForeignKey(SegmentoVI, on_delete=models.CASCADE, null=True, blank=True)
 
     # Metadatos
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)  # agente que atiende
     fecha = models.DateTimeField(auto_now=True)
 
     # Contacto si es anónimo
@@ -221,41 +225,53 @@ class Evaluacion(models.Model):
         verbose_name = "Evaluación"
         verbose_name_plural = "Evaluaciones"
         ordering = ['-fecha']
+        indexes = [
+            models.Index(fields=['fecha']),
+            models.Index(fields=['user']),
+            models.Index(fields=['tipo_canal']),
+        ]
 
     def __str__(self):
-        return f"{self.ciudadano.nombre} - {self.fecha}"
+        return f"{self.ciudadano.nombre} - {self.fecha:%Y-%m-%d %H:%M}"
 
 
-# ===================== ENCUESTA =====================
+# ===================== ENCUESTA (DINÁMICA) =====================
 
 class Encuesta(models.Model):
     """
-    Encuesta asociada 1:N a Evaluacion. Token único y expiración.
-    Los campos de métricas (abajo) se mantienen por compatibilidad,
-    pero la recomendación es usar RespuestaEncuesta para almacenar respuestas.
+    Encuesta 1:1 con Evaluación (para reportería).
+    También enlazamos explícitamente el usuario (agente) que la generó.
     """
-    evaluacion = models.ForeignKey(Evaluacion, on_delete=models.CASCADE, related_name='encuestas')
+    evaluacion = models.OneToOneField(Evaluacion, on_delete=models.CASCADE, related_name='encuesta')
+    agente = models.ForeignKey(User, on_delete=models.PROTECT, related_name='encuestas_creadas',null=True,blank=True)
 
-    # --- (LEGADO / Compatibilidad) ---
+    # (Legado/compatibilidad: si tu plantilla vieja los usa; puedes borrarlos si no se usan)
     dominioPersonaAtendio = models.IntegerField(null=True, blank=True)
     satisfaccionServicioRecibido = models.IntegerField(null=True, blank=True)
     tiempoEsperaServicio = models.IntegerField(null=True, blank=True)
     recomendacionCanalAtencion = models.IntegerField(null=True, blank=True)
     solucionSolicitud = models.BooleanField(null=True, blank=True)
-    # ----------------------------------
 
-    idInteraccion = models.CharField(max_length=150)
+    idInteraccion = models.CharField(max_length=150, blank=True, default='')
     seleccionarCanal = models.CharField(max_length=150, null=True, blank=True)
-    nombreAgente = models.CharField(max_length=150)
+    nombreAgente = models.CharField(max_length=150, blank=True, default='')  # snapshot del nombre
 
     token = models.CharField(max_length=50, unique=True, db_index=True)
     fechaExpiracionLink = models.DateTimeField(db_index=True)
-    fecha_creacion = models.DateTimeField(null=True, db_index=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    respondida_en = models.DateTimeField(null=True, blank=True, db_index=True)
 
     class Meta:
         verbose_name = "Encuesta"
         verbose_name_plural = "Encuestas"
         ordering = ['-fecha_creacion']
+        indexes = [
+            models.Index(fields=['token']),
+            models.Index(fields=['fechaExpiracionLink']),
+            models.Index(fields=['respondida_en']),
+            models.Index(fields=['agente']),
+        ]
 
     def __str__(self):
         return f"Encuesta {self.token} (Eval {self.evaluacion_id})"
@@ -264,16 +280,18 @@ class Encuesta(models.Model):
     def expirada(self):
         return timezone.now() > self.fechaExpiracionLink
 
+    @property
+    def cerrada(self):
+        return self.expirada or self.respondida_en is not None
+
 
 # ===================== PREGUNTAS DINÁMICAS DE ENCUESTA =====================
 
 class PreguntaEncuesta(models.Model):
+    TIPO_CHOICES = (("escala", "Escala 1-5"), ("si_no", "Sí/No"))
+
     texto = models.CharField(max_length=255)
-    tipo = models.CharField(
-        max_length=20,
-        choices=[("escala", "Escala 1-5"), ("si_no", "Sí/No")],
-        default="escala"
-    )
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default="escala")
     orden = models.PositiveIntegerField(default=1)
 
     class Meta:
@@ -288,17 +306,12 @@ class PreguntaEncuesta(models.Model):
 class RespuestaEncuesta(models.Model):
     encuesta = models.ForeignKey(Encuesta, on_delete=models.CASCADE, related_name="respuestas")
     pregunta = models.ForeignKey(PreguntaEncuesta, on_delete=models.CASCADE)
-    valor = models.CharField(max_length=10)
+    valor = models.CharField(max_length=10)  # "1".."5" o "Si"/"No"
 
     class Meta:
         verbose_name = "Respuesta de Encuesta"
         verbose_name_plural = "Respuestas de Encuesta"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["encuesta", "pregunta"],
-                name="uniq_encuesta_pregunta"
-            )
-        ]
+        unique_together = (("encuesta", "pregunta"),)
 
     def __str__(self):
         return f"{self.pregunta.texto} → {self.valor}"
@@ -311,3 +324,11 @@ class RegistroError(models.Model):
     excepcion = models.TextField()
     fecha = models.DateTimeField(auto_now=True)
     usuario = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Registro de error"
+        verbose_name_plural = "Registros de error"
+        ordering = ['-fecha']
+
+    def __str__(self):
+        return f"{self.metodo} - {self.fecha:%Y-%m-%d %H:%M}"

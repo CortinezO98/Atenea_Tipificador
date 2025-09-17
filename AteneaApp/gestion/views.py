@@ -115,10 +115,11 @@ def crear_evaluacion(request):
 
                 # === Crear encuesta de satisfacción (token + expiración) ===
                 token = get_random_string(24)
-                expira = now() + timedelta(days=7)
+                expira = now() + timedelta(hours=24)
 
                 encuesta = Encuesta.objects.create(
                     evaluacion=evaluacion,
+                    agente=request.user,
                     idInteraccion=request.POST.get('conversacion_id', ''),
                     nombreAgente=request.user.get_full_name() or request.user.username,
                     token=token,
@@ -160,8 +161,17 @@ def crear_evaluacion(request):
                 messages.success(
                     request,
                     format_html(
-                        'Evaluación guardada. Enlace de encuesta: <a href="{}" target="_blank" rel="noopener">abrir</a>',
-                        encuesta_url
+                        '✅ <strong>Evaluación guardada exitosamente</strong><br>'
+                        '<div class="text-center mt-2">'
+                        '<span class="text-muted small ms-2 link-copied-feedback" style="display:none;">'
+                        '<i class="bi bi-check-circle text-success me-1"></i>¡Copiado!'
+                        '</span>'
+                        '</div>'
+                        '<div class="mt-2 p-2 bg-light rounded">'
+                        '<code class="text-break small d-block">{}</code>'
+                        '</div>'
+                        '<small class="text-muted d-block mt-1 text-center">Comparte este enlace para acceder a la evaluación</small>',
+                        encuesta_url, encuesta_url
                     )
                 )
 
@@ -522,60 +532,51 @@ def exportar_excel(request):
     return resp
 
 
+@csrf_exempt   
 def encuesta_publica(request, token):
-    encuesta = get_object_or_404(
-        Encuesta.objects.select_related("evaluacion"),
-        token=token
-    )
+    encuesta = get_object_or_404(Encuesta, token=token)
+    if encuesta.cerrada:
+        if encuesta.expirada:
+            return render(request, 'usuarios/encuestas/expirada.html', {'encuesta': encuesta})
+        else:
+            return render(request, 'usuarios/encuestas/completada.html', {'encuesta': encuesta})
 
-    ya_respondida = encuesta.respuestas.exists()
-    if encuesta.expirada:
-        return render(request, "encuestas/expirada.html", {"encuesta": encuesta})
-    if ya_respondida and request.method == "GET":
-        return render(request, "encuestas/completada.html", {"encuesta": encuesta})
+    preguntas = list(PreguntaEncuesta.objects.all())
 
-    preguntas = PreguntaEncuesta.objects.all().order_by("orden")
-    FormClass = build_encuesta_form(preguntas)
+    if request.method == 'POST':
+        for p in preguntas:
+            field = f"q_{p.id}"
+            val = (request.POST.get(field) or '').strip()
+            if p.tipo == 'escala':
+                if val not in {'1', '2', '3', '4', '5'}:
+                    return render(request, 'usuarios/encuestas/form.html', {
+                        'encuesta': encuesta,
+                        'preguntas': preguntas,
+                        'error': f'Falta responder correctamente: "{p.texto}"'
+                    })
+            elif p.tipo == 'si_no':
+                if val not in {'Si', 'No'}:
+                    return render(request, 'usuarios/encuestas/form.html', {
+                        'encuesta': encuesta,
+                        'preguntas': preguntas,
+                        'error': f'Falta responder correctamente: "{p.texto}"'
+                    })
 
-    initial = {}
-    if ya_respondida:
-        for r in encuesta.respuestas.select_related("pregunta"):
-            initial[f"q_{r.pregunta_id}"] = r.valor
+            RespuestaEncuesta.objects.update_or_create(
+                encuesta=encuesta, pregunta=p, defaults={'valor': val}
+            )
+        
+        encuesta.respondida_en = timezone.now()
+        encuesta.save()
 
-    if request.method == "POST":
-        form = FormClass(request.POST)
-        if form.is_valid():
-            with transaction.atomic():
-                for p in preguntas:
-                    valor = form.cleaned_data[f"q_{p.id}"]
-                    RespuestaEncuesta.objects.update_or_create(
-                        encuesta=encuesta, pregunta=p,
-                        defaults={"valor": valor}
-                    )
-                try:
-                    primera = preguntas.first()
-                    if primera and primera.tipo == "escala":
-                        encuesta.satisfaccionServicioRecibido = int(
-                            form.cleaned_data[f"q_{primera.id}"]
-                        )
-                        encuesta.save(update_fields=["satisfaccionServicioRecibido"])
-                except Exception:
-                    pass
+        return render(request, 'usuarios/encuestas/gracias.html', {'encuesta': encuesta})
 
-            gracias_url = reverse("encuesta_gracias")
-            return redirect(gracias_url)
-    else:
-        form = FormClass(initial=initial)
+    respuestas_previas = {
+        r.pregunta_id: r.valor for r in RespuestaEncuesta.objects.filter(encuesta=encuesta)
+    }
 
-    return render(
-        request,
-        "encuestas/encuesta_publica.html",
-        {
-            "encuesta": encuesta,
-            "form": form,
-            "preguntas": preguntas,
-        },
-    )
-
-def encuesta_gracias(request):
-    return render(request, "encuestas/gracias.html")
+    return render(request, 'usuarios/encuestas/form.html', {
+        'encuesta': encuesta,
+        'preguntas': preguntas,
+        'respuestas_previas': respuestas_previas
+    })

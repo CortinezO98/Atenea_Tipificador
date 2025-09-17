@@ -1,7 +1,20 @@
-{% extends "base.html" %}
+{% extends "usuarios/encuestas/base/base.html" %}
+
 {% block content %}
-<div class="container py-4 text-center">
-  <h3>Encuesta expirada</h3>
-  <p>El enlace ya no está disponible. Gracias por tu interés.</p>
+<div class="status-container">
+  <div class="status-card expired">
+    <div class="status-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
+    </div>
+    <h2 class="status-title">Encuesta expirada</h2>
+    <p class="status-message">El período para responder esta encuesta ha finalizado. El enlace ya no está disponible.</p>
+    <p class="text-muted">Agradecemos tu interés en participar.</p>
+    <div class="status-actions">
+      <a href="/" class="btn btn-primary">Volver al inicio</a>
+    </div>
+  </div>
 </div>
 {% endblock %}

@@ -2,22 +2,25 @@ from django.core.management.base import BaseCommand
 from gestion.models import PreguntaEncuesta
 
 class Command(BaseCommand):
-    help = "Carga las preguntas iniciales de la encuesta de satisfacción"
+    help = "Carga las preguntas iniciales de la encuesta de satisfacción (versión Chat ATENEA)"
 
     def handle(self, *args, **options):
         preguntas = [
-            ("¿Cuál es su satisfacción con la atención recibida?", "escala"),
-            ("¿Considera que el asesor fue amable y proactivo durante la interacción?", "si_no"),
-            ("¿La asesoría recibida contribuye en la solución de su requerimiento?", "si_no"),
-            ("¿El tiempo de espera para ser atendido fue oportuno?", "si_no"),
+            (1, "¿Cuál es su satisfacción con la atención recibida?", "escala"),
+            (2, "¿Considera que el asesor fue amable y proactivo durante la interacción?", "si_no"),
+            (3, "¿La asesoría recibida contribuye en la solución de su requerimiento?", "si_no"),
+            (4, "¿El tiempo de espera para ser atendido fue oportuno?", "si_no"),
         ]
 
-        for i, (texto, tipo) in enumerate(preguntas, start=1):
+        creadas = 0
+        for orden, texto, tipo in preguntas:
             obj, created = PreguntaEncuesta.objects.get_or_create(
-                texto=texto,
-                defaults={"tipo": tipo, "orden": i}
+                texto=texto, defaults={"tipo": tipo, "orden": orden}
             )
-            if created:
-                self.stdout.write(self.style.SUCCESS(f"Pregunta creada: {texto}"))
-            else:
-                self.stdout.write(self.style.WARNING(f"Ya existía: {texto}"))
+            if not created:
+                obj.tipo = tipo
+                obj.orden = orden
+                obj.save()
+            creadas += int(created)
+
+        self.stdout.write(self.style.SUCCESS(f"Preguntas listas. Nuevas creadas: {creadas}"))
