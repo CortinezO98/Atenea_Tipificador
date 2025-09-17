@@ -30,12 +30,20 @@ SECRET_KEY = 'django-insecure-g92ofvy03gl(f+nkm4jt03ypz=uxb1+ixtd($6h*l3c+mt&f*6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = not IN_PRODUCTION
 
-ALLOWED_HOSTS = ['typifica.grupoasd.com','www.typifica.grupoasd.com','10.0.4.149' if IN_PRODUCTION else '*']
-
 if IN_PRODUCTION:
-    CSRF_TRUSTED_ORIGINS = [
-        'https://typifica.grupoasd.com/',
+    ALLOWED_HOSTS = [
+        'tipificadoratenea.ddns.net',
+        'www.tipificadoratenea.ddns.net',
+        '172.190.158.214',
+        'typifica.grupoasd.com',
     ]
+
+    CSRF_TRUSTED_ORIGINS = [
+        'https://tipificadoratenea.ddns.net',
+        'https://www.tipificadoratenea.ddns.net',
+    ]
+else:
+    ALLOWED_HOSTS = ['*']
 
 # Application definition
 
