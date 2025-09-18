@@ -398,12 +398,41 @@ $(document).ready(function () {
   });
 
   // ==================== NIVELES (N1..N6) ====================
+  // Helpers para selects y "wrappers" (div.col-md-4)
+  function sel(n){ return $(`#nivel${n}`); }
+  function wrap(n){ return sel(n).closest('.col-md-4'); }
+
   function limpiarSelectConPlaceholder($sel, placeholder) {
     $sel.empty().append(`<option value="" selected disabled>${placeholder}</option>`);
   }
   function fillSelect($sel, items, placeholder) {
     limpiarSelectConPlaceholder($sel, placeholder);
     (items || []).forEach(it => $sel.append(`<option value="${it.id}">${it.nombre}</option>`));
+  }
+  // Mostrar/ocultar un nivel y habilitar/deshabilitar su select
+  function showNivel(n, show) {
+    const $s = sel(n), $w = wrap(n);
+    if (show) {
+      $w.show();
+      $s.prop('disabled', false);
+    } else {
+      $w.hide();
+      $s.prop('disabled', true).val('');
+    }
+  }
+  // Limpia y oculta desde "desde" hasta 6; N1 queda visible por defecto
+  function resetNivelesDesde(desde) {
+    for (let n = desde; n <= 6; n++) {
+      const $s = sel(n);
+      fillSelect($s, [], `Seleccione Nivel ${n}...`);
+      // N1 es siempre requerido; los demás solo si tienen hijos
+      $s.prop('required', n === 1);
+      if (n === 1 && desde === 1) {
+        showNivel(1, true);
+      } else if (n > 1) {
+        showNivel(n, false);
+      }
+    }
   }
   async function fetchNiveles(nivel, padreId=null) {
     const params = new URLSearchParams({ nivel: String(nivel) });
@@ -412,44 +441,52 @@ $(document).ready(function () {
     if (!res.ok) return [];
     return res.json();
   }
-  function resetNivelesDesde(desde) {
-    for (let n = desde; n <= 6; n++) {
-      const $s = $(`#nivel${n}`);
-      fillSelect($s, [], `Seleccione Nivel ${n}...`);
-      $s.prop('required', n === 1);
-    }
-  }
   async function cargarNivel1() {
+    resetNivelesDesde(1);
     const data = await fetchNiveles(1);
-    fillSelect($('#nivel1'), data, 'Seleccione Nivel 1...');
+    fillSelect(sel(1), data, 'Seleccione Nivel 1...');
+    showNivel(1, true);
   }
   async function cargarHijos(nivelHijo, padreId) {
+    // Limpia y oculta niveles desde el hijo
     resetNivelesDesde(nivelHijo);
     if (!padreId) return;
+
     const data = await fetchNiveles(nivelHijo, padreId);
-    fillSelect($(`#nivel${nivelHijo}`), data, `Seleccione Nivel ${nivelHijo}...`);
-    $(`#nivel${nivelHijo}`).prop('required', data.length > 0);
+    fillSelect(sel(nivelHijo), data, `Seleccione Nivel ${nivelHijo}...`);
+
+    if (data.length > 0) {
+      // Hay hijos → mostrar el nivel hijo y exigirlo
+      showNivel(nivelHijo, true);
+      sel(nivelHijo).prop('required', true);
+    } else {
+      // No hay hijos → mantener ocultos los siguientes y no requeridos
+      for (let n = nivelHijo; n <= 6; n++) {
+        sel(n).prop('required', false);
+        showNivel(n, false);
+      }
+    }
   }
 
-  // Encadenar niveles
-  $('#nivel1').on('change', function(){ cargarHijos(2, $(this).val()); });
-  $('#nivel2').on('change', function(){ cargarHijos(3, $(this).val()); });
-  $('#nivel3').on('change', function(){ cargarHijos(4, $(this).val()); });
-  $('#nivel4').on('change', function(){ cargarHijos(5, $(this).val()); });
-  $('#nivel5').on('change', function(){ cargarHijos(6, $(this).val()); });
+  // Encadenar niveles (si el actual cambia, cargar el siguiente)
+  sel(1).on('change', function(){ cargarHijos(2, $(this).val()); });
+  sel(2).on('change', function(){ cargarHijos(3, $(this).val()); });
+  sel(3).on('change', function(){ cargarHijos(4, $(this).val()); });
+  sel(4).on('change', function(){ cargarHijos(5, $(this).val()); });
+  sel(5).on('change', function(){ cargarHijos(6, $(this).val()); });
 
   // ==================== VALIDACIONES ====================
   $('form').on('submit', function (e) {
-    // Niveles: N1 siempre requerido
-    if (!$('#nivel1').val()) {
-      e.preventDefault(); mostrarMensaje('Por favor seleccione el Nivel 1.'); $('#nivel1').focus(); return false;
+    // N1 siempre requerido
+    if (!sel(1).val()) {
+      e.preventDefault(); mostrarMensaje('Por favor seleccione el Nivel 1.'); sel(1).focus(); return false;
     }
-
-    // Si un nivel tiene opciones (más del placeholder), exigir selección antes de seguir
+    // Si un nivel está visible y tiene opciones (>1 con placeholder), debe seleccionarse
     for (let n = 2; n <= 6; n++) {
-      const $s = $(`#nivel${n}`);
+      const $s = sel(n);
+      const visible = wrap(n).is(':visible');
       const tieneOpciones = $s.find('option').length > 1;
-      if (tieneOpciones && !$s.val()) {
+      if (visible && tieneOpciones && !$s.val()) {
         e.preventDefault();
         mostrarMensaje(`Por favor seleccione el Nivel ${n}.`);
         $s.focus();
@@ -536,7 +573,8 @@ $(document).ready(function () {
   // ==================== INICIALIZACIÓN ====================
   $('#numero_identificacion').focus();
   actualizarEstadoCiudadano(false);
-  // Cargar N1 al iniciar
+  // Cargar N1 al iniciar y ocultar N2..N6
+  resetNivelesDesde(1);
   cargarNivel1();
 });
 </script>
