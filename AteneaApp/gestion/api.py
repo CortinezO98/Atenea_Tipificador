@@ -18,6 +18,18 @@ def ciudadano(request):
             'direccion_residencia': ciu.direccion_residencia,
             'pais_id': ciu.pais_id,
             'ciudad': ciu.ciudad,
+            'sexo_id': ciu.sexo_id,
+            'genero_id': ciu.genero_id,
+            'orientacion_id': ciu.orientacion_id,
+            'tiene_discapacidad_id': ciu.tiene_discapacidad_id,
+            'discapacidad_id': ciu.discapacidad_id,
+            'rango_edad_id': ciu.rango_edad_id,
+            'nivel_educativo_id': ciu.nivel_educativo_id,
+            'grupo_etnico_id': ciu.grupo_etnico_id,
+            'grupo_poblacional_id': ciu.grupo_poblacional_id,
+            'estrato_id': ciu.estrato_id,
+            'localidad_id': ciu.localidad_id,
+            'calidad_comunicacion_id': ciu.calidad_comunicacion_id,
         })
     except Ciudadano.DoesNotExist:
         return JsonResponse({}, status=404)

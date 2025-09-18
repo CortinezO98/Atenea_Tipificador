@@ -32,13 +32,30 @@
 
             <div class="row g-3">
               <div class="col-md-6">
+                <label class="form-label"><i class="bi bi-broadcast-pin me-1"></i>Tipo de Canal <span class="text-danger">*</span></label>
+                <select name="tipo_canal" id="tipo_canal" class="form-select" required>
+                  <option value="" disabled selected>Seleccionar...</option>
+                  {% for tc in tipos_canal %}
+                    <option value="{{ tc.id }}">{{ tc.nombre }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-6">
                 <label for="numero_identificacion" class="form-label">
                   <i class="bi bi-123 me-1"></i>Número de Identificación
                   <span class="text-danger">*</span>
                 </label>
                 <div class="input-group">
-                  <input type="text" name="numero_identificacion" id="numero_identificacion"
-                         class="form-control" maxlength="20" required>
+                  <input
+                    type="text"
+                    name="numero_identificacion"
+                    id="numero_identificacion"
+                    class="form-control"
+                    maxlength="10"
+                    pattern="^\d{1,10}$"
+                    inputmode="numeric"
+                    title="Solo números (máx. 10)."
+                    required>
                   <button type="button" id="btn_anonimo" class="btn btn-outline-info" title="Cargar ciudadano anónimo">
                     <i class="bi bi-person-fill-x me-1"></i>Anónimo
                   </button>
@@ -68,7 +85,15 @@
                   <i class="bi bi-person-circle me-1"></i>Nombre Completo
                   <span class="text-danger">*</span>
                 </label>
-                <input type="text" name="nombre" id="nombre" class="form-control" maxlength="255" required>
+                <input
+                  type="text"
+                  name="nombre"
+                  id="nombre"
+                  class="form-control"
+                  maxlength="255"
+                  pattern="^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ .'-]{2,255}$"
+                  title="Solo letras y espacios (admite acentos, punto y guion)."
+                  required>
               </div>
 
               <div class="col-md-6">
@@ -85,7 +110,15 @@
                 <label for="correo" class="form-label">
                   <i class="bi bi-envelope me-1"></i>Correo electrónico
                 </label>
-                <input type="email" name="correo" id="correo" class="form-control" maxlength="254">
+                <input
+                  type="email"
+                  name="correo"
+                  id="correo"
+                  class="form-control"
+                  maxlength="254"
+                  inputmode="email"
+                  pattern="^[^@\s]+@[^@\s]+\.[^@\s]+$"
+                  title="Debe ser un correo válido con @ (ej: usuario@dominio.com)">
               </div>
 
               <!-- Teléfono -->
@@ -93,7 +126,15 @@
                 <label for="telefono" class="form-label">
                   <i class="bi bi-telephone me-1"></i>Teléfono del que se comunica
                 </label>
-                <input type="text" name="telefono" id="telefono" class="form-control" maxlength="20">
+                <input
+                  type="text"
+                  name="telefono"
+                  id="telefono"
+                  class="form-control"
+                  maxlength="20"
+                  inputmode="numeric"
+                  pattern="^\d{0,20}$"
+                  title="Solo números (máx. 20).">
               </div>
 
               <!-- NUEVO: Teléfono Inconcer (solo visible en Anónimo para Agente) -->
@@ -101,8 +142,16 @@
                 <label for="telefono_inconcer" class="form-label">
                   <i class="bi bi-telephone-inbound me-1"></i>Teléfono Inconcer
                 </label>
-                <input type="text" name="telefono_inconcer" id="telefono_inconcer"
-                       class="form-control" maxlength="20" placeholder="Teléfono que llega desde Inconcer">
+                <input
+                  type="text"
+                  name="telefono_inconcer"
+                  id="telefono_inconcer"
+                  class="form-control"
+                  maxlength="20"
+                  inputmode="numeric"
+                  pattern="^\d{0,20}$"
+                  placeholder="Teléfono que llega desde Inconcer"
+                  title="Solo números (máx. 20).">
               </div>
 
               <!-- Dirección -->
@@ -135,6 +184,102 @@
               </div>
 
               <input type="text" name="cuidadano_id" id="cuidadano_id" value="" hidden>
+
+              <div class="col-md-4">
+                <label class="form-label">Sexo</label>
+                <select name="sexo" id="sexo" class="form-select">
+                  <option value="" selected>Seleccionar...</option>
+                  {% for x in sexos %}<option value="{{x.id}}">{{x.nombre}}</option>{% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">¿Cuál es tu género?</label>
+                <select name="genero" id="genero" class="form-select">
+                  <option value="" selected>Seleccionar...</option>
+                  {% for x in generos %}<option value="{{x.id}}">{{x.nombre}}</option>{% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">¿Cuál es tu orientación sexual?</label>
+                <select name="orientacion" id="orientacion" class="form-select">
+                  <option value="" selected>Seleccionar...</option>
+                  {% for x in orientaciones %}<option value="{{x.id}}">{{x.nombre}}</option>{% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">¿Tienes alguna discapacidad?</label>
+                <select name="tiene_discapacidad" id="tiene_discapacidad" class="form-select">
+                  <option value="" selected>Seleccionar...</option>
+                  {% for x in tiene_discapacidades %}<option value="{{x.id}}">{{x.nombre}}</option>{% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-8" id="wrap_discapacidad" style="display:none;">
+                <label class="form-label">¿Cuál discapacidad?</label>
+                <select name="discapacidad" id="discapacidad" class="form-select">
+                  <option value="">Seleccionar...</option>
+                  {% for x in discapacidades %}<option value="{{x.id}}">{{x.nombre}}</option>{% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">¿Cuál es tu rango de edad?</label>
+                <select name="rango_edad" id="rango_edad" class="form-select">
+                  <option value="" selected>Seleccionar...</option>
+                  {% for x in rangos_edad %}<option value="{{x.id}}">{{x.nombre}}</option>{% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">¿Cuál es tu nivel educativo?</label>
+                <select name="nivel_educativo" id="nivel_educativo" class="form-select">
+                  <option value="" selected>Seleccionar...</option>
+                  {% for x in niveles_educativos %}<option value="{{x.id}}">{{x.nombre}}</option>{% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">¿Perteneces a algún grupo étnico?</label>
+                <select name="grupo_etnico" id="grupo_etnico" class="form-select">
+                  <option value="" selected>Seleccionar...</option>
+                  {% for x in grupos_etnicos %}<option value="{{x.id}}">{{x.nombre}}</option>{% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-8">
+                <label class="form-label">¿Perteneces a alguno de los siguientes grupos poblacionales?</label>
+                <select name="grupo_poblacional" id="grupo_poblacional" class="form-select">
+                  <option value="" selected>Seleccionar...</option>
+                  {% for x in grupos_poblacionales %}<option value="{{x.id}}">{{x.nombre}}</option>{% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">Estrato socioeconómico</label>
+                <select name="estrato" id="estrato" class="form-select">
+                  <option value="" selected>Seleccionar...</option>
+                  {% for x in estratos %}<option value="{{x.id}}">{{x.nombre}}</option>{% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">Localidad en Bogotá</label>
+                <select name="localidad" id="localidad" class="form-select">
+                  <option value="" selected>Seleccionar...</option>
+                  {% for x in localidades %}<option value="{{x.id}}">{{x.nombre}}</option>{% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">Te comunicas en calidad de</label>
+                <select name="calidad_comunicacion" id="calidad_comunicacion" class="form-select">
+                  <option value="" selected>Seleccionar...</option>
+                  {% for x in calidades %}<option value="{{x.id}}">{{x.nombre}}</option>{% endfor %}
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -347,6 +492,23 @@ $(document).ready(function () {
     }
   });
 
+  // ==================== DISCAPACIDAD (toggle) ====================
+  function toggleDiscapacidad(){
+    const val = $('#tiene_discapacidad').val();
+    if (val === '1'){ // "Si" (id=1 según seeders)
+      $('#wrap_discapacidad').stop(true, true).slideDown(150);
+      $('#discapacidad').prop('required', true);
+    } else {
+      $('#wrap_discapacidad').stop(true, true).slideUp(150);
+      $('#discapacidad').prop('required', false).val('');
+    }
+  }
+  // Exponer a window para que otros scripts puedan invocarla
+  window.toggleDiscapacidad = toggleDiscapacidad;
+
+  $('#tiene_discapacidad').on('change', toggleDiscapacidad);
+  toggleDiscapacidad(); // init
+
   // ==================== BÚSQUEDA DE CIUDADANO ====================
   $('#numero_identificacion').on('change blur', function () {
     const numero = $(this).val().trim();
@@ -364,7 +526,9 @@ $(document).ready(function () {
       data: { numero_identificacion: numero },
       success: function (r) {
         $('#numero_identificacion').prop('disabled', false);
+
         if (r && r.id) {
+          // Básicos
           $('#tipo_identificacion').val(r.tipo_identificacion_id);
           $('#nombre').val(r.nombre);
           $('#correo').val(r.correo || '');
@@ -373,11 +537,31 @@ $(document).ready(function () {
           $('#pais').val(r.pais_id || '');
           $('#ciudad').val(r.ciudad || '');
           $('#cuidadano_id').val(r.id);
+
+          // ===== NUEVOS CAMPOS (IDs desde API; no falla si no vienen) =====
+          if (typeof r.sexo_id !== 'undefined') $('#sexo').val(r.sexo_id || '');
+          if (typeof r.genero_id !== 'undefined') $('#genero').val(r.genero_id || '');
+          if (typeof r.orientacion_id !== 'undefined') $('#orientacion').val(r.orientacion_id || '');
+          if (typeof r.tiene_discapacidad_id !== 'undefined') $('#tiene_discapacidad').val(r.tiene_discapacidad_id || '');
+          if (typeof r.discapacidad_id !== 'undefined') $('#discapacidad').val(r.discapacidad_id || '');
+          if (typeof r.rango_edad_id !== 'undefined') $('#rango_edad').val(r.rango_edad_id || '');
+          if (typeof r.nivel_educativo_id !== 'undefined') $('#nivel_educativo').val(r.nivel_educativo_id || '');
+          if (typeof r.grupo_etnico_id !== 'undefined') $('#grupo_etnico').val(r.grupo_etnico_id || '');
+          if (typeof r.grupo_poblacional_id !== 'undefined') $('#grupo_poblacional').val(r.grupo_poblacional_id || '');
+          if (typeof r.estrato_id !== 'undefined') $('#estrato').val(r.estrato_id || '');
+          if (typeof r.localidad_id !== 'undefined') $('#localidad').val(r.localidad_id || '');
+          if (typeof r.calidad_comunicacion_id !== 'undefined') $('#calidad_comunicacion').val(r.calidad_comunicacion_id || '');
+
+          // Acomodar UI de discapacidad según lo que llegó
+          toggleDiscapacidad();
+
           actualizarEstadoCiudadano(true, r);
         } else {
           $('#cuidadano_id').val('');
           actualizarEstadoCiudadano(false);
+          toggleDiscapacidad();
         }
+
         if ($('#numero_identificacion').val().trim() === NUMERO_ANONIMO) {
           $('#correo').val(''); $('#telefono').val('');
           $('#es_anonimo').prop('checked', true);
@@ -388,6 +572,7 @@ $(document).ready(function () {
         $('#numero_identificacion').prop('disabled', false);
         $('#cuidadano_id').val('');
         actualizarEstadoCiudadano(false);
+        toggleDiscapacidad();
         if (xhr.status === 404) {
           mostrarMensaje('Ciudadano no encontrado. Puede proceder con el registro.', 'info');
         } else {
@@ -475,11 +660,11 @@ $(document).ready(function () {
   sel(4).on('change', function(){ cargarHijos(5, $(this).val()); });
   sel(5).on('change', function(){ cargarHijos(6, $(this).val()); });
 
-  // ==================== VALIDACIONES ====================
+  // ==================== VALIDACIONES (propias de niveles y preguntas extra) ====================
   $('form').on('submit', function (e) {
     // N1 siempre requerido
     if (!sel(1).val()) {
-      e.preventDefault(); mostrarMensaje('Por favor seleccione el Nivel 1.'); sel(1).focus(); return false;
+      e.preventDefault(); Swal.fire({icon:'error', title:'Dato faltante', text:'Por favor seleccione el Nivel 1.'}); sel(1).focus(); return false;
     }
     // Si un nivel está visible y tiene opciones (>1 con placeholder), debe seleccionarse
     for (let n = 2; n <= 6; n++) {
@@ -488,7 +673,7 @@ $(document).ready(function () {
       const tieneOpciones = $s.find('option').length > 1;
       if (visible && tieneOpciones && !$s.val()) {
         e.preventDefault();
-        mostrarMensaje(`Por favor seleccione el Nivel ${n}.`);
+        Swal.fire({icon:'error', title:'Dato faltante', text:`Por favor seleccione el Nivel ${n}.`});
         $s.focus();
         return false;
       }
@@ -497,19 +682,19 @@ $(document).ready(function () {
     // Preguntas adicionales (solo si existen en el DOM)
     const uriSel = $('input[name="se_comunica_uri"]:checked').val();
     if (uriSel === '1' && $('#ciudad_municipio_uri').length && !$('#ciudad_municipio_uri').val().trim()) {
-      e.preventDefault(); mostrarMensaje('Por favor indique la ciudad/municipio de la URI.'); $('#ciudad_municipio_uri').focus(); return false;
+      e.preventDefault(); Swal.fire({icon:'error', title:'Dato faltante', text:'Por favor indique la ciudad/municipio de la URI.'}); $('#ciudad_municipio_uri').focus(); return false;
     }
     const cj = $('input[name="consulta_juridica"]:checked').val();
     if (cj === '1' && $('#abogado').length && !$('#abogado').val()) {
-      e.preventDefault(); mostrarMensaje('Por favor seleccione un abogado para la consulta jurídica.'); $('#abogado').focus(); return false;
+      e.preventDefault(); Swal.fire({icon:'error', title:'Dato faltante', text:'Por favor seleccione un abogado para la consulta jurídica.'}); $('#abogado').focus(); return false;
     }
 
     // Validación especial ciudadano
     if (ciudadanoExistente) {
       const cid = $('#cuidadano_id').val();
-      if (!cid) { e.preventDefault(); mostrarMensaje('Error: ID de ciudadano no encontrado. Busque nuevamente el ciudadano.'); $('#numero_identificacion').focus(); return false; }
+      if (!cid) { e.preventDefault(); Swal.fire({icon:'error', title:'Error', text:'ID de ciudadano no encontrado. Busque nuevamente el ciudadano.'}); $('#numero_identificacion').focus(); return false; }
       const num = $('#numero_identificacion').val(), tid = $('#tipo_identificacion').val(), nom = $('#nombre').val();
-      if (!num || !tid || !nom) { e.preventDefault(); mostrarMensaje('Error en los datos del ciudadano. Por favor, busque nuevamente.'); $('#numero_identificacion').focus(); return false; }
+      if (!num || !tid || !nom) { e.preventDefault(); Swal.fire({icon:'error', title:'Error', text:'Error en los datos del ciudadano. Por favor, busque nuevamente.'}); $('#numero_identificacion').focus(); return false; }
       $('.campo-bloqueado').each(function () {
         if ($(this).is('select') && $(this).prop('disabled')) {
           $(this).prop('disabled', false).addClass('temp-enabled-for-submit');
@@ -517,7 +702,7 @@ $(document).ready(function () {
       });
     } else {
       const num = $('#numero_identificacion').val(), tid = $('#tipo_identificacion').val(), nom = $('#nombre').val();
-      if (!num || !tid || !nom) { e.preventDefault(); mostrarMensaje('Por favor complete los datos básicos del ciudadano (Número ID, Tipo ID, Nombre).'); return false; }
+      if (!num || !tid || !nom) { e.preventDefault(); Swal.fire({icon:'error', title:'Dato faltante', text:'Complete los datos básicos del ciudadano (Número ID, Tipo ID, Nombre).'}); return false; }
     }
 
     return true;
@@ -551,6 +736,11 @@ $(document).ready(function () {
     // Otros
     $('#conversacion_id').val('');
     $('#observacion').val('');
+
+    // Reset caracterización (discapacidad)
+    $('#tiene_discapacidad').val('');
+    $('#discapacidad').val('').prop('required', false);
+    $('#wrap_discapacidad').hide();
   }
 
   $('#btn_limpiar, button[type="reset"]').on('click', function (e) {
@@ -565,7 +755,7 @@ $(document).ready(function () {
     }).then((r) => {
       if (r.isConfirmed) {
         limpiarFormularioCompleto();
-        mostrarMensaje('Formulario limpiado correctamente.', 'success');
+        Swal.fire({icon:'success', text:'Formulario limpiado correctamente.'});
       }
     });
   });
@@ -591,8 +781,24 @@ $(document).ready(function () {
   const $tel       = $('#telefono');
   const $inconcer  = $('#telefono_inconcer');
   const $wrapIncon = $('#wrap_telefono_inconcer');
+  const $tipoCanal = $('#tipo_canal');
 
-  const CAMPOS_BLOQUEAR = ['#tipo_identificacion','#nombre','#direccion_residencia','#pais','#ciudad'];
+  if (!$('#estilos-bloqueados').length) {
+    $('head').append(`
+      <style id="estilos-bloqueados">
+        .campo-bloqueado{background-color:#f8f9fa!important;border-color:#dee2e6!important;color:#6c757d!important;cursor:not-allowed!important}
+        .campo-bloqueado:focus{box-shadow:none!important}
+        select.campo-bloqueado{pointer-events:none!important}
+      </style>
+    `);
+  }
+
+  const CAMPOS_BLOQUEAR = [
+    '#tipo_identificacion', '#nombre', '#direccion_residencia', '#pais', '#ciudad',
+    '#sexo', '#genero', '#orientacion', '#tiene_discapacidad', '#discapacidad',
+    '#rango_edad', '#nivel_educativo', '#grupo_etnico', '#grupo_poblacional',
+    '#estrato', '#localidad', '#calidad_comunicacion'
+  ];
 
   function setDisabled(selOrArr, val){
     const list = Array.isArray(selOrArr) ? selOrArr : [selOrArr];
@@ -613,27 +819,115 @@ $(document).ready(function () {
   window.applyAnonUI = function applyAnonUI(){
     if (IS_SUPERVISOR){
       $wrapIncon.hide();
-      return;
+    } else {
+      $wrapIncon.show();
     }
+
     const anon = syncAnonFlag();
-    setDisabled(CAMPOS_BLOQUEAR, anon);
-    setDisabled([$correo, $tel], false);
-    $wrapIncon.show();
-    setDisabled($inconcer, false);
+
+    setDisabled(CAMPOS_BLOQUEAR, anon);  // bloquea nuevos campos cuando es anónimo
+    setDisabled([$correo, $tel], false); // contacto siempre habilitado
+    setDisabled($inconcer, false);       // inconcer siempre habilitado
+    setDisabled($tipoCanal, false);      // tipo canal siempre habilitado
 
     if (anon){
       $correo.attr('placeholder','Correo de contacto (anónimo)');
       $tel.attr('placeholder','Teléfono del que se comunica (anónimo)');
       $inconcer.attr('placeholder','Teléfono Inconcer (anónimo)');
+      $('#wrap_discapacidad').stop(true,true).slideUp(150);
+      $('#discapacidad').prop('required', false).val('');
     } else {
       $correo.attr('placeholder','');
       $tel.attr('placeholder','Teléfono del que se comunica');
       $inconcer.attr('placeholder','Teléfono que llega desde Inconcer');
+      if (typeof window.toggleDiscapacidad === 'function') {
+        window.toggleDiscapacidad();
+      }
     }
   };
 
-  $numId.on('input change blur', function(){ applyAnonUI(); });
+  $numId.on('input change blur', applyAnonUI);
+  $chkAnon.on('change', applyAnonUI);
   applyAnonUI();
+})();
+</script>
+
+<!-- Script de validaciones + ALERTAS (HTML5 + SweetAlert) -->
+<script>
+(function () {
+  const byId = id => document.getElementById(id);
+  const onlyDigits = (el, max) => { el.value = el.value.replace(/\D+/g, '').slice(0, max); };
+
+  // Número de identificación: 1–10 dígitos
+  const numId = byId('numero_identificacion');
+  if (numId) {
+    numId.addEventListener('input', () => onlyDigits(numId, 10));
+    numId.addEventListener('invalid', function () {
+      if (this.validity.patternMismatch || this.validity.valueMissing) {
+        this.setCustomValidity('Ingrese solo números (máx. 10).');
+      }
+    });
+    numId.addEventListener('input', function(){ this.setCustomValidity(''); });
+  }
+
+  // Nombre: solo letras/espacios/acentos/punto/guion
+  const nombre = byId('nombre');
+  if (nombre) {
+    nombre.addEventListener('invalid', function () {
+      if (this.validity.patternMismatch || this.validity.valueMissing) {
+        this.setCustomValidity('Ingrese un nombre válido (solo letras, espacios, acentos, punto o guion).');
+      }
+    });
+    nombre.addEventListener('input', function(){ this.setCustomValidity(''); });
+  }
+
+  // Correo: formato válido con @
+  const correo = byId('correo');
+  if (correo) {
+    correo.addEventListener('invalid', function () {
+      if (this.value && (this.validity.typeMismatch || this.validity.patternMismatch)) {
+        this.setCustomValidity('Ingrese un correo válido con @ (ej: usuario@dominio.com).');
+      }
+    });
+    correo.addEventListener('input', function(){ this.setCustomValidity(''); });
+  }
+
+  // Teléfonos: 0–20 dígitos (opcionales)
+  ['telefono', 'telefono_inconcer'].forEach(id => {
+    const el = byId(id);
+    if (!el) return;
+    el.addEventListener('input', () => onlyDigits(el, 20));
+    el.addEventListener('invalid', function () {
+      if (this.validity.patternMismatch) {
+        this.setCustomValidity('Solo números (máx. 20).');
+      }
+    });
+    el.addEventListener('input', function(){ this.setCustomValidity(''); });
+  });
+
+  // ===== ALERTA GLOBAL para cualquier campo inválido (sustituye el tooltip nativo) =====
+  // Nota: el evento 'invalid' no burbujea, por eso usamos captura (true).
+  document.addEventListener('invalid', function (e) {
+    e.preventDefault(); // evita el tooltip del navegador
+    const el   = e.target;
+    const name = (el.labels && el.labels[0]) ? el.labels[0].innerText.trim() : (el.name || 'Campo');
+    const msg  = el.validationMessage || 'Revise el valor ingresado.';
+    // Marca visual
+    el.classList.add('is-invalid');
+    // Alerta
+    Swal.fire({
+      icon: 'error',
+      title: 'Dato inválido',
+      html: `<strong>${name}</strong><br>${msg}`
+    }).then(() => el.focus());
+  }, true);
+
+  // Quitar marca visual al corregir
+  document.addEventListener('input', function (e) {
+    if (e.target.classList.contains('is-invalid')) {
+      e.target.classList.remove('is-invalid');
+    }
+  }, true);
 })();
 </script>
 {% endblock %}

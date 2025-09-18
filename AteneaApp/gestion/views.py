@@ -42,19 +42,15 @@ def index(request):
 @en_grupo([Roles.ADMINISTRADOR.value, Roles.SUPERVISOR.value, Roles.AGENTE.value])
 def crear_evaluacion(request):
     """
-    Crea Evaluación usando solo los insumos mínimos:
-      - Tipos de Identificación (obligatorio para Ciudadano)
-      - Países (opcional en el POST, pero deben existir en BD)
-      - Árbol de Niveles (Categoria nivel 1..6). Se guarda la categoría más profunda escogida.
-
-    Sin dependencias de canales/segmentos/tipificaciones.
+    Crea Evaluación:
+      - Captura/actualiza Ciudadano (con caracterización por IDs si NO es anónimo)
+      - Guarda categoría final (árbol N1..N6)
+      - Guarda tipo_canal_id
+      - Crea encuesta asociada
     """
     if request.method == 'POST':
         try:
             with transaction.atomic():
-                # -----------------------------
-                # 1) Ciudadano / Anónimo
-                # -----------------------------
                 numero_doc = (request.POST.get('numero_identificacion') or '').strip()
                 es_anonimo = (request.POST.get('es_anonimo') == '1') or (numero_doc in ('9999', '9999999'))
 
@@ -62,74 +58,66 @@ def crear_evaluacion(request):
                     ciudadano = get_ciudadano_anonimo()
                 else:
                     cid = request.POST.get('cuidadano_id')
+                    ciu_kwargs = dict(
+                        tipo_identificacion_id=request.POST['tipo_identificacion'],
+                        numero_identificacion=request.POST['numero_identificacion'],
+                        nombre=request.POST['nombre'],
+                        correo=request.POST.get('correo', ''),
+                        telefono=request.POST.get('telefono', ''),
+                        direccion_residencia=request.POST.get('direccion_residencia', ''),
+                        pais_id=(request.POST.get('pais') or None),
+                        ciudad=request.POST.get('ciudad', ''),
+                        sexo_id=request.POST.get('sexo') or None,
+                        genero_id=request.POST.get('genero') or None,
+                        orientacion_id=request.POST.get('orientacion') or None,
+                        tiene_discapacidad_id=request.POST.get('tiene_discapacidad') or None,
+                        discapacidad_id=(request.POST.get('discapacidad') or None)
+                            if (request.POST.get('tiene_discapacidad') == '1') else None,
+                        rango_edad_id=request.POST.get('rango_edad') or None,
+                        nivel_educativo_id=request.POST.get('nivel_educativo') or None,
+                        grupo_etnico_id=request.POST.get('grupo_etnico') or None,
+                        grupo_poblacional_id=request.POST.get('grupo_poblacional') or None,
+                        estrato_id=request.POST.get('estrato') or None,
+                        localidad_id=request.POST.get('localidad') or None,
+                        calidad_comunicacion_id=request.POST.get('calidad_comunicacion') or None,
+                    )
+
                     if cid:
                         ciudadano = Ciudadano.objects.get(id=cid)
-                        ciudadano.tipo_identificacion_id = request.POST['tipo_identificacion']
-                        ciudadano.numero_identificacion   = request.POST['numero_identificacion']
-                        ciudadano.nombre                  = request.POST['nombre']
-                        ciudadano.correo                  = request.POST.get('correo', '')
-                        ciudadano.telefono                = request.POST.get('telefono', '')
-                        ciudadano.direccion_residencia    = request.POST.get('direccion_residencia', '')
-                        ciudadano.pais_id                 = request.POST.get('pais') or None
-                        ciudadano.ciudad                  = request.POST.get('ciudad', '')
+                        for k, v in ciu_kwargs.items():
+                            setattr(ciudadano, k, v)
                         ciudadano.save()
                     else:
-                        ciudadano = Ciudadano.objects.create(
-                            tipo_identificacion_id=request.POST['tipo_identificacion'],
-                            numero_identificacion=request.POST['numero_identificacion'],
-                            nombre=request.POST['nombre'],
-                            correo=request.POST.get('correo', ''),
-                            telefono=request.POST.get('telefono', ''),
-                            direccion_residencia=request.POST.get('direccion_residencia', ''),
-                            pais_id=request.POST.get('pais') or None,
-                            ciudad=request.POST.get('ciudad', '')
-                        )
+                        ciudadano = Ciudadano.objects.create(**ciu_kwargs)
 
-                # ---------------------------------------------
-                # 2) Categoría final: tomar el nivel más profundo
-                #    disponible (prioridad N6 -> N1)
-                # ---------------------------------------------
                 categoria_final_id = None
                 for key in ('nivel6', 'nivel5', 'nivel4', 'nivel3', 'nivel2', 'nivel1'):
                     val = request.POST.get(key)
                     if val and val != "0":
                         categoria_final_id = val
                         break
-
-                # Validación mínima: debe existir una categoría seleccionada (árbol N1..N6)
                 if not categoria_final_id:
                     raise ValueError("Debes seleccionar al menos una categoría (N1..N6).")
 
-                # Tel Inconcer (el form puede traer 'telefono_inconser' o 'telefono_inconcer')
                 tel_inconser = request.POST.get('telefono_inconser') or request.POST.get('telefono_inconcer') or ''
-
-                # ---------------------------------------------
-                # 3) Crear Evaluación (solo con categoría final)
-                #    Campos legacy en None
-                # ---------------------------------------------
                 evaluacion = Evaluacion.objects.create(
                     conversacion_id=request.POST['conversacion_id'],
                     observacion=request.POST['observacion'],
                     ciudadano=ciudadano,
                     user=request.user,
 
-                    # Solo categoría final (árbol N1→N6)
                     categoria_id=categoria_final_id,
+                    tipo_canal_id=(request.POST.get('tipo_canal') or None),
 
-                    # Legacy OFF
-                    tipo_canal=None, segmento=None, segmento_ii=None, segmento_iii=None,
+                    segmento=None, segmento_ii=None, segmento_iii=None,
                     segmento_iv=None, segmento_v=None, segmento_vi=None, tipificacion=None,
 
-                    # Contactos cuando es anónimo
                     es_anonimo=es_anonimo,
-                    contacto_correo   = (request.POST.get('correo', '')   if es_anonimo else None),
-                    contacto_telefono = (request.POST.get('telefono', '') if es_anonimo else None),
-                    contacto_telefono_inconcer = tel_inconser,
+                    contacto_correo=(request.POST.get('correo', '') if es_anonimo else None),
+                    contacto_telefono=(request.POST.get('telefono', '') if es_anonimo else None),
+                    contacto_telefono_inconcer=tel_inconser,
                 )
 
-                # ---------------------------------------------
-                # 4) Encuesta (token + expiración 24h)
-                # ---------------------------------------------
                 token = get_random_string(24)
                 expira = now() + timedelta(hours=24)
                 encuesta = Encuesta.objects.create(
@@ -141,12 +129,8 @@ def crear_evaluacion(request):
                     fechaExpiracionLink=expira,
                     fecha_creacion=now()
                 )
+                encuesta_url = request.build_absolute_uri(reverse('encuesta_publica', kwargs={'token': token}))
 
-                encuesta_url = request.build_absolute_uri(
-                    reverse('encuesta_publica', kwargs={'token': token})
-                )
-
-                # Log útil para depurar qué niveles llegaron por POST
                 debug_info = {
                     'nivel1': request.POST.get('nivel1'),
                     'nivel2': request.POST.get('nivel2'),
@@ -155,11 +139,12 @@ def crear_evaluacion(request):
                     'nivel5': request.POST.get('nivel5'),
                     'nivel6': request.POST.get('nivel6'),
                     'categoria_final_id': categoria_final_id,
+                    'tipo_canal': request.POST.get('tipo_canal'),
                     'es_anonimo': request.POST.get('es_anonimo'),
                     'telefono_inconcer': tel_inconser,
                     'encuesta_token': encuesta.token,
                 }
-                print(f"DEBUG - Crear evaluación (solo Niveles): {debug_info}")
+                print(f"DEBUG - Crear evaluación: {debug_info}")
 
                 messages.success(
                     request,
@@ -183,14 +168,10 @@ def crear_evaluacion(request):
             messages.error(request, f"Ocurrió un error al guardar la evaluación: {str(e)}")
         return redirect('index')
 
-    # ---------------------------------------------------------
-    # GET: datos mínimos del formulario (SIN canales/segmentos)
-    # ---------------------------------------------------------
     tiposIdentificacion = TipoIdentificacion.objects.all()
     paises = Pais.objects.all()
     hay_nivel1 = Categoria.objects.filter(nivel=1).exists()
 
-    # Guard MÍNIMO: solo lo que sí usas (TiposID, Países y al menos un Nivel 1)
     if (not tiposIdentificacion.exists()) or (not paises.exists()) or (not hay_nivel1):
         messages.warning(
             request,
@@ -207,7 +188,21 @@ def crear_evaluacion(request):
             or ValidarRolUsuario(request, Roles.ADMINISTRADOR.value)
         ),
         'numero_anonimo': '9999999',
+        'sexos': Sexo.objects.all(),
+        'generos': Genero.objects.all(),
+        'orientaciones': OrientacionSexual.objects.all(),
+        'tiene_discapacidades': TieneDiscapacidad.objects.all(),
+        'discapacidades': Discapacidad.objects.all(),
+        'rangos_edad': RangoEdad.objects.all(),
+        'niveles_educativos': NivelEducativo.objects.all(),
+        'grupos_etnicos': GrupoEtnico.objects.all(),
+        'grupos_poblacionales': GrupoPoblacional.objects.all(),
+        'estratos': Estrato.objects.all(),
+        'localidades': Localidad.objects.all(),
+        'calidades': CalidadComunicacion.objects.all(),
+        'tipos_canal': TipoCanal.objects.all(),
     })
+
 
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value, Roles.SUPERVISOR.value, Roles.AGENTE.value])
@@ -395,11 +390,27 @@ def exportar_excel(request):
         .select_related(
             'ciudadano__tipo_identificacion',
             'ciudadano__pais',
+
+            # ===== NUEVO: evitar N+1 en caracterización =====
+            'ciudadano__sexo',
+            'ciudadano__genero',
+            'ciudadano__orientacion',
+            'ciudadano__tiene_discapacidad',
+            'ciudadano__discapacidad',
+            'ciudadano__rango_edad',
+            'ciudadano__nivel_educativo',
+            'ciudadano__grupo_etnico',
+            'ciudadano__grupo_poblacional',
+            'ciudadano__estrato',
+            'ciudadano__localidad',
+            'ciudadano__calidad_comunicacion',
+
+            # Relaciones ya existentes
             'categoria__tipificacion',
             'categoria__categoria_padre',
             'user',
-            # Relaciones legacy (no exportamos sus columnas, pero no molestan):
-            'tipo_canal', 'segmento', 'segmento_ii', 'segmento_iii',
+            'tipo_canal',  # para nombre del canal
+            'segmento', 'segmento_ii', 'segmento_iii',
             'segmento_iv', 'segmento_v', 'segmento_vi', 'tipificacion',
         )
         .order_by('-fecha')
@@ -440,17 +451,28 @@ def exportar_excel(request):
     headers = [
         'Fecha', 'Tipo Documento', 'Número ID', 'Nombre',
         'Correo', 'Teléfono',
-        'Correo contacto', 'Teléfono contacto', 'Teléfono Inconcer',
         'País', 'Ciudad', 'Dirección',
+
+        # === BLOQUE CIUDADANO: CARACTERIZACIÓN (ahora junto al ciudadano) ===
+        'Sexo','Género','Orientación Sexual','Tiene Discapacidad','Discapacidad',
+        'Rango de Edad','Nivel Educativo','Grupo Étnico','Grupo Poblacional',
+        'Estrato','Localidad','Calidad Comunicación',
+
+        # Contactos de anónimo / externos
+        'Correo contacto', 'Teléfono contacto', 'Teléfono Inconcer',
+
+        # Conversación
         'ID Conversación',
 
         # SOLO NIVELES
         'Nivel 1', 'Nivel 2', 'Nivel 3', 'Nivel 4', 'Nivel 5', 'Nivel 6', 'Nivel Final',
 
-        # ENCUESTA DE SATISFACCIÓN (misma fila)
+        # ENCUESTA
         'Encuesta estado', 'Encuesta respondida en', 'Encuesta token', 'Encuesta URL',
         'Encuesta promedio (escala 1-5)', 'Encuesta respuestas (texto)',
 
+        # Otros
+        'Tipo de Canal',
         'Observación',
         'Usuario'
     ]
@@ -551,27 +573,38 @@ def exportar_excel(request):
             enc_respuestas_txt = " | ".join(txt_pairs) if txt_pairs else ''
 
         data = [
+            # Fecha y ciudadano básico
             localtime(ev.fecha).strftime('%Y-%m-%d %H:%M'),
             ciu.tipo_identificacion.nombre,
             ciu.numero_identificacion,
             ciu.nombre,
-            correo_base,
-            telf_base,
-            correo_contacto,
-            telf_contacto,
-            telf_inconser,
+            ciu.correo or '',
+            ciu.telefono or '',
             ciu.pais.nombre if ciu.pais else '',
             ciu.ciudad or '',
             ciu.direccion_residencia or '',
+
+            # === CARACTERIZACIÓN (pegada al ciudadano) ===
+            getattr(ciu.sexo, 'nombre', ''),
+            getattr(ciu.genero, 'nombre', ''),
+            getattr(ciu.orientacion, 'nombre', ''),
+            getattr(ciu.tiene_discapacidad, 'nombre', ''),
+            (getattr(ciu.discapacidad, 'nombre', '') if ciu.tiene_discapacidad_id == 1 else ''),
+            getattr(ciu.rango_edad, 'nombre', ''),
+            getattr(ciu.nivel_educativo, 'nombre', ''),
+            getattr(ciu.grupo_etnico, 'nombre', ''),
+            getattr(ciu.grupo_poblacional, 'nombre', ''),
+            getattr(ciu.estrato, 'nombre', ''),
+            getattr(ciu.localidad, 'nombre', ''),
+            getattr(ciu.calidad_comunicacion, 'nombre', ''),
+            ev.contacto_correo or '',
+            ev.contacto_telefono or '',
+            ev.contacto_telefono_inconcer or '',
             ev.conversacion_id,
-
-            # N1..N6 + Final
             n1, n2, n3, n4, n5, n6, nivel_final,
-
-            # Encuesta (misma fila)
             enc_estado, enc_resp_en, enc_token, enc_url,
             enc_prom_escala, enc_respuestas_txt,
-
+            getattr(ev.tipo_canal, 'nombre', ''),
             ev.observacion,
             ev.user.username
         ]

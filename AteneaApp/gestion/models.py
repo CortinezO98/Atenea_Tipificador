@@ -28,6 +28,56 @@ class Pais(models.Model):
     def __str__(self):
         return self.nombre
 
+class Sexo(models.Model):
+    nombre = models.CharField(max_length=50, unique=True)
+    def __str__(self): return self.nombre
+
+class Genero(models.Model):
+    nombre = models.CharField(max_length=50, unique=True)
+    def __str__(self): return self.nombre
+
+class OrientacionSexual(models.Model):
+    nombre = models.CharField(max_length=50, unique=True)
+    def __str__(self): return self.nombre
+
+class TieneDiscapacidad(models.Model):
+    """Sí / No / No Responde (para toggle de campo 'cual')."""
+    nombre = models.CharField(max_length=20, unique=True)
+    def __str__(self): return self.nombre
+
+class Discapacidad(models.Model):
+    """Catálogo 'cuál discapacidad' (Física, Visual, etc.)."""
+    nombre = models.CharField(max_length=80, unique=True)
+    def __str__(self): return self.nombre
+
+class RangoEdad(models.Model):
+    nombre = models.CharField(max_length=30, unique=True)
+    def __str__(self): return self.nombre
+
+class NivelEducativo(models.Model):
+    nombre = models.CharField(max_length=50, unique=True)
+    def __str__(self): return self.nombre
+
+class GrupoEtnico(models.Model):
+    nombre = models.CharField(max_length=50, unique=True)
+    def __str__(self): return self.nombre
+
+class GrupoPoblacional(models.Model):
+    nombre = models.CharField(max_length=80, unique=True)
+    def __str__(self): return self.nombre
+
+class Estrato(models.Model):
+    nombre = models.CharField(max_length=20, unique=True)  
+    def __str__(self): return self.nombre
+
+class Localidad(models.Model):
+    nombre = models.CharField(max_length=60, unique=True)  
+    def __str__(self): return self.nombre
+
+class CalidadComunicacion(models.Model):
+    """'Te comunicas en calidad de'."""
+    nombre = models.CharField(max_length=60, unique=True)
+    def __str__(self): return self.nombre
 
 class Ciudadano(models.Model):
     tipo_identificacion = models.ForeignKey(TipoIdentificacion, on_delete=models.CASCADE)
@@ -38,6 +88,20 @@ class Ciudadano(models.Model):
     direccion_residencia = models.CharField("Dirección de residencia", max_length=255, blank=True)
     pais = models.ForeignKey(Pais, on_delete=models.PROTECT, null=True, blank=True)
     ciudad = models.CharField(max_length=100, null=True, blank=True)
+    sexo = models.ForeignKey(Sexo, on_delete=models.PROTECT, null=True, blank=True)
+    genero = models.ForeignKey(Genero, on_delete=models.PROTECT, null=True, blank=True)
+    orientacion = models.ForeignKey(OrientacionSexual, on_delete=models.PROTECT, null=True, blank=True)
+
+    tiene_discapacidad = models.ForeignKey(TieneDiscapacidad, on_delete=models.PROTECT, null=True, blank=True)
+    discapacidad = models.ForeignKey(Discapacidad, on_delete=models.PROTECT, null=True, blank=True)  # visible solo si 'Sí'
+
+    rango_edad = models.ForeignKey(RangoEdad, on_delete=models.PROTECT, null=True, blank=True)
+    nivel_educativo = models.ForeignKey(NivelEducativo, on_delete=models.PROTECT, null=True, blank=True)
+    grupo_etnico = models.ForeignKey(GrupoEtnico, on_delete=models.PROTECT, null=True, blank=True)
+    grupo_poblacional = models.ForeignKey(GrupoPoblacional, on_delete=models.PROTECT, null=True, blank=True)
+    estrato = models.ForeignKey(Estrato, on_delete=models.PROTECT, null=True, blank=True)
+    localidad = models.ForeignKey(Localidad, on_delete=models.PROTECT, null=True, blank=True)
+    calidad_comunicacion = models.ForeignKey(CalidadComunicacion, on_delete=models.PROTECT, null=True, blank=True)
 
     class Meta:
         verbose_name = "Ciudadano"

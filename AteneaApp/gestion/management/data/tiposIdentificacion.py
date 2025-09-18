@@ -15,4 +15,16 @@ tiposIdentificacion = [
         "id":4,
         "nombre":"Pasaporte"
     },
+    {
+        "id":5,
+        "nombre":"NIT"
+    },
+    {
+        "id":6,
+        "nombre":"NUIP"
+    },
+    {
+        "id":7,
+        "nombre":"Permiso especial de permanencia"
+    },
 ]
