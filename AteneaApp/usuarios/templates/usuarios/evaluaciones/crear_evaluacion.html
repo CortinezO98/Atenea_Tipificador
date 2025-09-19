@@ -124,7 +124,7 @@
               <!-- Teléfono -->
               <div class="col-md-6">
                 <label for="telefono" class="form-label">
-                  <i class="bi bi-telephone me-1"></i>Teléfono del que se comunica
+                  <i class="bi bi-telephone me-1"></i>Teléfono de contacto
                 </label>
                 <input
                   type="text"
@@ -832,13 +832,13 @@ $(document).ready(function () {
 
     if (anon){
       $correo.attr('placeholder','Correo de contacto (anónimo)');
-      $tel.attr('placeholder','Teléfono del que se comunica (anónimo)');
+      $tel.attr('placeholder','Teléfono de contacto (anónimo)');
       $inconcer.attr('placeholder','Teléfono Inconcer (anónimo)');
       $('#wrap_discapacidad').stop(true,true).slideUp(150);
       $('#discapacidad').prop('required', false).val('');
     } else {
       $correo.attr('placeholder','');
-      $tel.attr('placeholder','Teléfono del que se comunica');
+      $tel.attr('placeholder','Teléfono de contacto');
       $inconcer.attr('placeholder','Teléfono que llega desde Inconcer');
       if (typeof window.toggleDiscapacidad === 'function') {
         window.toggleDiscapacidad();

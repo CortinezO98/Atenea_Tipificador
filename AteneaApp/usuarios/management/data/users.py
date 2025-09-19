@@ -158,4 +158,14 @@ users = [
         'last_name': 'Montenegro Aguirre',
         'email': 'cristian.montenegro@iq-online.com',
     },
+    {
+        'username': 'AdminAtenea',
+        'password': ADMIN_PASSWORD,
+        'is_superuser': True,
+        'is_staff': True,
+        'role_id': Roles.ADMINISTRADOR.value,
+        'first_name': 'ATenea',
+        'last_name': 'Admin',
+        'email': 'jose.cortez@iq-online',
+    },
 ]
