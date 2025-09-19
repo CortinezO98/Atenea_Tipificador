@@ -111,7 +111,7 @@ TREE: Dict[str, Any] = {
             "MANUAL OPERATIVO": [],
             "FORMALIZACIÓN": [],
         },
-        "FEST": {
+        "FONDO FEST": {
             "PASANTÍAS": ["OFERTA PASANTÍAS", "CERTIFICADO DE PASANTIAS"],
             "CONDONACIÓN": [],
         },
@@ -120,7 +120,7 @@ TREE: Dict[str, Any] = {
             "CONDONACIÓN": [],
             "MANUAL OPERATIVO": [],
         },
-        "VICTIMA DE CONFLICTO ARMADO": {
+        "VÍCTIMA DE CONFLICTO ARMADO": {
             "APOYO DE SOSTENIMIENTO": {
                 "DISPERSIÓN": {"ESTADO DE APOYO DE SOSTENIMIENTO": ["RECHAZADO", "PAGO PENDIENTE", "PAGO EXITOSO"]}
             },
@@ -134,7 +134,7 @@ TREE: Dict[str, Any] = {
         },
         "FONDOS GENERALES": {"MANUAL OPERATIVO": []},
         "FONDOS LOCALES": {"INFORMACIÓN GENERAL": []},
-        "UNIVERSIDADES PUBLICAS": {"MANUAL OPERATIVO": []},
+        "UNIVERSIDADES PÚBLICAS": {"MANUAL OPERATIVO": []},
     },
 
     "CIENCIA, TECNOLOGÍA E INNOVACIÓN": {
@@ -163,7 +163,7 @@ TREE: Dict[str, Any] = {
     },
 
     "INFORMACIÓN GENERAL": {
-        "ASESORIA": {
+        "ASESORÍA": {
             "PRESENCIAL": {
                 "HORARIOS DE ATENCIÓN": [],
                 "PUNTOS DE ATENCIÓN": [],
@@ -183,7 +183,7 @@ TREE: Dict[str, Any] = {
     },
 
     "NO EFECTIVA": {
-        "FALLA DE RED": {"CAIDA DE INTERACCIÓN": []},
+        "FALLA DE RED": {"CAÍDA DE INTERACCIÓN": []},
         "INTERACCIÓN COLGADA": {
             "CIERRE DE CHAT CON GUION": [],
             "FINALIZA CHAT CIUDADANO":[],
