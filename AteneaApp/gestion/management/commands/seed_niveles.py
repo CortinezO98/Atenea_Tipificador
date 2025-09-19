@@ -1,25 +1,33 @@
-# gestion/management/commands/seed_niveles.py
+from unicodedata import normalize, combining
+from typing import Any, Dict, List, Union
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.db.models import Model
-from typing import Any, Dict, List, Union
-
-from gestion.models import Categoria  # ajusta si tu modelo está en otra app
-
+from gestion.models import Categoria  
 """
 Seeder N1..N6 para Categoria.
-- Crea/actualiza por (nombre, nivel, categoria_padre).
 - No borra nada.
 - Idempotente: puedes correrlo varias veces.
-- Solo incluye en defaults los campos que EXISTEN en el modelo (p.ej. tipificacion).
+- Corrige tildes renombrando el registro existente SIN crear duplicados.
 """
 
 # --------------------------
-# Utilidades de reflexión
+# Utilidades
 # --------------------------
 def model_has_field(model: Model, field_name: str) -> bool:
     return field_name in {f.name for f in model._meta.get_fields()}
 
+def strip_accents(s: str) -> str:
+    """Quita tildes/diacríticos para comparar de forma acento-insensible."""
+    if s is None:
+        return ""
+    nfd = normalize("NFD", s)
+    return "".join(ch for ch in nfd if not combining(ch))
+
+def canon(s: str) -> str:
+    """Normaliza para comparación: quita tildes, pone minúsculas y colapsa espacios internos."""
+    base = strip_accents(s).lower().strip()
+    return " ".join(base.split())
 # --------------------------
 # Árbol de niveles (según tu Excel)
 # Estructura:
@@ -197,34 +205,67 @@ TREE: Dict[str, Any] = {
 }
 
 # --------------------------
-# Upsert de categorías
+# Upsert de categorías (sin duplicar)
 # --------------------------
 def upsert_categoria(nombre: str, nivel: int, padre=None):
     """
-    Crea/actualiza Categoria por (nombre, nivel, categoria_padre).
-    Solo añade a defaults los campos que existan en el modelo.
+    Intenta encontrar el registro existente en este (nivel, padre) y renombrarlo
+    al 'nombre' exacto (con tildes) sin crear duplicados.
+    Orden de match:
+      1) nombre__iexact (DB, solo case-insensitive)
+      2) match por clave canónica (sin tildes + espacios colapsados)
+      3) crear
     """
-    defaults: Dict[str, Any] = {}
-    if model_has_field(Categoria, 'tipificacion'):
-        defaults['tipificacion'] = None  # legacy off
+    nombre_ok = normalize('NFC', nombre.strip())
+    clave_new = canon(nombre_ok)
 
-    # Si tu modelo SÍ tiene 'activo', se agregará; si no, no (evita el FieldError)
-    if model_has_field(Categoria, 'activo'):
-        defaults['activo'] = True
-
-    obj, created = Categoria.objects.get_or_create(
-        nombre=nombre.strip(),
-        nivel=nivel,
-        categoria_padre=padre,
-        defaults=defaults
+    # 1) Coincidencia por iexact (rápida, si solo difiere mayúsculas/tildes según collation)
+    obj = (
+        Categoria.objects
+        .filter(nivel=nivel, categoria_padre=padre, nombre__iexact=nombre_ok)
+        .first()
     )
+    if obj:
+        updates = []
+        if obj.nombre != nombre_ok:
+            obj.nombre = nombre_ok
+            updates.append('nombre')
+        if model_has_field(Categoria, 'tipificacion') and getattr(obj, 'tipificacion_id', None):
+            obj.tipificacion = None
+            updates.append('tipificacion')
+        if model_has_field(Categoria, 'activo') and getattr(obj, 'activo', True) is not True:
+            obj.activo = True
+            updates.append('activo')
+        if updates:
+            obj.save(update_fields=updates)
+        return obj, False
 
-    # Si existía con tipificación, y queremos desasociarla para niveles
-    if model_has_field(Categoria, 'tipificacion') and getattr(obj, 'tipificacion_id', None):
-        obj.tipificacion = None
-        obj.save(update_fields=['tipificacion'])
+    # 2) Coincidencia acento-insensible + espacios
+    candidatos = Categoria.objects.filter(nivel=nivel, categoria_padre=padre)
+    for cand in candidatos:
+        if canon(cand.nombre) == clave_new:
+            updates = []
+            if cand.nombre != nombre_ok:
+                cand.nombre = nombre_ok
+                updates.append('nombre')
+            if model_has_field(Categoria, 'tipificacion') and getattr(cand, 'tipificacion_id', None):
+                cand.tipificacion = None
+                updates.append('tipificacion')
+            if model_has_field(Categoria, 'activo') and getattr(cand, 'activo', True) is not True:
+                cand.activo = True
+                updates.append('activo')
+            if updates:
+                cand.save(update_fields=updates)
+            return cand, False
 
-    return obj, created
+    # 3) Crear si no existe nada equivalente
+    create_kwargs: Dict[str, Any] = dict(nombre=nombre_ok, nivel=nivel, categoria_padre=padre)
+    if model_has_field(Categoria, 'tipificacion'):
+        create_kwargs['tipificacion'] = None
+    if model_has_field(Categoria, 'activo'):
+        create_kwargs['activo'] = True
+    obj_new = Categoria.objects.create(**create_kwargs)
+    return obj_new, True
 
 # --------------------------
 # Recorrido recursivo
@@ -235,11 +276,9 @@ def walk(node: Union[Dict[str, Any], List[Any], str], nivel: int, padre):
       - dict: { "Hijo": subnode, ... }
       - list: ["Hijo1", "Hijo2", ...]  (hojas del nivel actual)
       - str : nombre de hoja (nivel actual)
-
     Límite: nivel 6 (N6). Todo lo que caiga por debajo se crea en N6.
     """
     if nivel >= 6:
-        # Forzar cualquier hijo adicional como N6
         if isinstance(node, dict):
             for k in node.keys():
                 upsert_categoria(k, 6, padre)
@@ -262,7 +301,6 @@ def walk(node: Union[Dict[str, Any], List[Any], str], nivel: int, padre):
             if isinstance(nombre, str):
                 upsert_categoria(nombre, nivel, padre)
             else:
-                # En caso de mezcla rara (lista con dicts), procesar recursivo al mismo nivel
                 walk(nombre, nivel, padre)
 
     elif isinstance(node, str):
@@ -277,7 +315,6 @@ class Command(BaseCommand):
     @transaction.atomic
     def handle(self, *args, **options):
         creados = 0
-        actualizados_tip = 0
 
         for n1_nombre, sub in TREE.items():
             n1, was_created = upsert_categoria(n1_nombre, 1, None)
@@ -285,7 +322,6 @@ class Command(BaseCommand):
                 creados += 1
             walk(sub, 2, n1)
 
-        # Pequeño resumen
         total_n1 = Categoria.objects.filter(nivel=1).count()
         total_n2 = Categoria.objects.filter(nivel=2).count()
         total_n3 = Categoria.objects.filter(nivel=3).count()
