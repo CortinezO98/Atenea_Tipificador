@@ -1,4 +1,4 @@
-import sys, unicodedata, csv
+import sys, unicodedata, csv, re
 from pathlib import Path
 from typing import Dict, Optional, List
 from django.core.management.base import BaseCommand
@@ -31,6 +31,20 @@ def build_cache(model, field="nombre", extra_map: Dict[str, int]=None) -> Dict[s
 def pick_id(cache: Dict[str, int], label: Optional[str]) -> Optional[int]:
     key = norm(label or "")
     return cache.get(key)
+
+# patch mínimo sugerido 
+def limit(s: str, n: int) -> str:
+    s = s or ""
+    return s[:n]
+
+def clean_phone(raw: str) -> str:
+    raw = raw or ""
+    raw = raw.strip()
+    plus = raw.startswith('+')
+    digits = re.sub(r'\D+', '', raw)
+    if plus:
+        digits = '+' + digits
+    return limit(digits, 20)
 
 class Command(BaseCommand):
     help = "Importa ciudadanos desde XLSX, CSV o TSV. Si ya existe, lo omite. Campos vacíos se guardan vacíos. Genera CSV de omitidos."
@@ -73,7 +87,8 @@ class Command(BaseCommand):
         tiene_disc_cache = build_cache(TieneDiscapacidad, extra_map={"si":1, "sí":1, "no":2})
 
         total = nuevos = saltados = omitidos = 0
-        omitidos_lista = []
+        omitidos_lista: List[str] = []
+        saltados_largos: List[str] = []   
 
         # lector universal 
         def iter_filas():
@@ -92,9 +107,14 @@ class Command(BaseCommand):
 
         def parse_row(r: dict) -> Optional[Ciudadano]:
             nonlocal saltados
-            num_doc = (r.get("Numero Documento") or "").strip()
-            if not num_doc:
+            # límites y saneos 
+            numero = (r.get("Numero Documento") or "").strip()
+            if not numero:
                 saltados += 1
+                return None
+            if len(numero) > 20:
+                saltados += 1
+                saltados_largos.append(numero)
                 return None
 
             tipo_doc_id = pick_id(tipoid_cache, r.get("TipoDocumento"))
@@ -102,11 +122,11 @@ class Command(BaseCommand):
                 saltados += 1
                 return None
 
-            nombres   = (r.get("nombres") or "").strip()
-            apellidos = (r.get("apellidos") or "").strip()
-            telefono  = (r.get("Celular") or "").strip()
-            correo    = (r.get("correo_electronico") or "").strip()
-            municipio = (r.get("Municipio") or "").strip()
+            nombres   = limit((r.get("nombres") or "").strip(), 255)
+            apellidos = limit((r.get("apellidos") or "").strip(), 255)
+            telefono  = clean_phone(r.get("Celular") or "")
+            correo    = limit((r.get("correo_electronico") or "").strip(), 254)
+            municipio = limit((r.get("Municipio") or "").strip(), 100)
 
             sexo_id    = pick_id(sexo_cache, r.get("Sexo"))
             genero_id  = pick_id(genero_cache, r.get("genero"))
@@ -123,21 +143,22 @@ class Command(BaseCommand):
             disc_label = (r.get("discapacidad") or "").strip()
             td_id = pick_id(tiene_disc_cache, disc_label)
             disca_id = None
+            
             if not td_id and pick_id(disca_cache, disc_label):
                 td_id = 1
                 disca_id = pick_id(disca_cache, disc_label)
             elif td_id == 1:
                 disca_id = pick_id(disca_cache, disc_label)
 
-            nombre_completo = (f"{nombres} {apellidos}").strip()
+            nombre_completo = limit((f"{nombres} {apellidos}").strip(), 255)
 
             return Ciudadano(
-                numero_identificacion=num_doc,
+                numero_identificacion=numero,
                 nombre=nombre_completo,
-                correo=correo,
-                telefono=telefono,
-                direccion_residencia="",
-                ciudad=(municipio or None),
+                correo=correo,                 
+                telefono=telefono,             
+                direccion_residencia="",       
+                ciudad=(municipio or None),    
                 pais_id=pais_id,
                 tipo_identificacion_id=tipo_doc_id,
                 calidad_comunicacion_id=calidad_id,
@@ -154,12 +175,12 @@ class Command(BaseCommand):
                 tiene_discapacidad_id=td_id,
             )
 
-        #función para procesar lotes 
+        # función para procesar lotes 
         def flush(rows):
             nonlocal nuevos, omitidos
             if not rows:
                 return
-            docs = [ (r.get("Numero Documento") or "").strip() for r in rows if (r.get("Numero Documento") or "").strip() ]
+            docs = [(r.get("Numero Documento") or "").strip() for r in rows if (r.get("Numero Documento") or "").strip()]
             existentes = set(
                 Ciudadano.objects.filter(numero_identificacion__in=docs)
                 .values_list("numero_identificacion", flat=True)
@@ -181,6 +202,7 @@ class Command(BaseCommand):
                     Ciudadano.objects.bulk_create(crear, batch_size=len(crear))
                     nuevos += len(crear)
 
+        # ejecutar 
         batch = []
         for row in iter_filas():
             total += 1
@@ -202,6 +224,19 @@ class Command(BaseCommand):
                 f"Archivo generado: {out_path} ({len(omitidos_lista)} omitidos)"
             ))
 
+        # guardar saltados por doc largo
+        if saltados_largos:
+            out2 = ruta.parent / "ciudadanos_saltados_doc_largo.csv"
+            with out2.open("w", newline="", encoding="utf-8") as f:
+                w = csv.writer(f)
+                w.writerow(["numero_identificacion"])
+                for num in saltados_largos:
+                    w.writerow([num])
+            self.stdout.write(self.style.WARNING(
+                f"Archivo generado: {out2} ({len(saltados_largos)} saltados por doc > 20)"
+            ))
+
+        # resumen final 
         resumen = (
             f"Procesadas: {total:,} | Nuevos: {nuevos:,} | "
             f"Omitidos (ya existen): {omitidos:,} | Saltados: {saltados:,}"
