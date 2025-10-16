@@ -348,6 +348,14 @@
 </div>
 
 <script>
+  const IS_AGENTE     = {% if is_agente %}true{% else %}false{% endif %};
+  const IS_SUPERVISOR = {% if is_supervisor %}true{% else %}false{% endif %}; 
+  const IS_ADMIN      = {% if is_admin %}true{% else %}false{% endif %};      
+  const IS_EDITABLE   = IS_AGENTE || IS_SUPERVISOR || IS_ADMIN;               
+</script>
+
+
+<script>
 $(document).ready(function () {
   // ==================== VARIABLES GLOBALES ====================
   let ciudadanoExistente = false;
@@ -411,11 +419,18 @@ $(document).ready(function () {
     const $btnL   = $('#btn_limpiar_busqueda');
 
     if (esExistente && datos) {
-      $texto.text('Ciudadano existente');
+      $texto.text(IS_EDITABLE ? 'Ciudadano existente (edición habilitada)' : 'Ciudadano existente');
       $estado.removeClass('bg-light text-dark').addClass('bg-success text-white').show();
-      $alerta.slideDown();
+
+      if (IS_EDITABLE) {
+        $alerta.slideUp();                 
+        bloquearCamposCiudadano(false);    
+      } else {
+        $alerta.slideDown();               
+        bloquearCamposCiudadano(true);   
+      }
+
       $btnL.show();
-      bloquearCamposCiudadano(true);
       mostrarMensaje(`Ciudadano encontrado: ${datos.nombre}`, 'success');
     } else {
       $texto.text('Nuevo ciudadano');

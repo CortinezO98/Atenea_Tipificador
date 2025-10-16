@@ -187,6 +187,8 @@ def crear_evaluacion(request):
             ValidarRolUsuario(request, Roles.SUPERVISOR.value)
             or ValidarRolUsuario(request, Roles.ADMINISTRADOR.value)
         ),
+        'is_agente': ValidarRolUsuario(request, Roles.AGENTE.value),
+        'is_admin': ValidarRolUsuario(request, Roles.ADMINISTRADOR.value),
         'numero_anonimo': '9999999',
         'sexos': Sexo.objects.all(),
         'generos': Genero.objects.all(),
