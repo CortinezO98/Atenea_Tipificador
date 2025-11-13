@@ -108,7 +108,6 @@
             </div>
 
             <!-- Rol -->
-            
             <div class="col-md-6">
               <label for="id_rol" class="form-label">Rol*</label>
               <select class="form-select {% if form.rol.errors %}is-invalid{% endif %}" id="id_rol" name="rol" required>
@@ -150,7 +149,7 @@
       </div>
     </div>
     <div class="text-center mt-3">
-      <small class="text-muted">© Fiscalía General de la Nación - IQ Outsourcing - {% now "Y" %}</small>
+      <small class="text-muted">© ATENEA - IQ Outsourcing - {% now "Y" %}</small>
     </div>
   </div>
 </div>
@@ -172,27 +171,27 @@ document.querySelectorAll('.toggle-password').forEach(button => {
 });
 
 // Verificación de fortaleza y coincidencia de contraseñas
-function checkPasswordStrength(password) {
+function evaluatePwdStrength(pwdValue) {
   let strength = 0;
   
-  if (password.length >= 8) strength += 25;
-  if (/\d/.test(password)) strength += 25;
-  if (/[A-Z]/.test(password)) strength += 25;
-  if (/[^A-Za-z0-9]/.test(password)) strength += 25;
+  if (pwdValue.length >= 8) strength += 25;
+  if (/\d/.test(pwdValue)) strength += 25;
+  if (/[A-Z]/.test(pwdValue)) strength += 25;
+  if (/[^A-Za-z0-9]/.test(pwdValue)) strength += 25;
   
   return strength;
 }
 
 function updatePasswordFeedback() {
-  const password = document.getElementById('id_password').value;
-  const confirmPassword = document.getElementById('id_confirm_password').value;
+  const pwdValue = document.getElementById('id_password').value;
+  const confirmPwdValue = document.getElementById('id_confirm_password').value;
   const matchFeedback = document.getElementById('password-match-text');
   const matchIcon = document.getElementById('password-match-icon');
   const strengthBar = document.getElementById('password-strength-bar');
   
   // Actualizar barra de fortaleza
-  if (password.length > 0) {
-    const strength = checkPasswordStrength(password);
+  if (pwdValue.length > 0) {
+    const strength = evaluatePwdStrength(pwdValue);
     strengthBar.style.width = `${strength}%`;
     
     if (strength < 50) {
@@ -204,11 +203,12 @@ function updatePasswordFeedback() {
     }
   } else {
     strengthBar.style.width = '0%';
+    strengthBar.className = 'progress-bar';
   }
   
-  // Verificar coincidencia de contraseñas
-  if (password && confirmPassword) {
-    if (password === confirmPassword) {
+  // Verificar coincidencia de contraseñas (sin exponer el valor)
+  if (pwdValue && confirmPwdValue) {
+    if (pwdValue === confirmPwdValue) {
       matchFeedback.textContent = 'Las contraseñas coinciden';
       matchFeedback.className = 'text-success';
       matchIcon.className = 'bi bi-check-circle-fill text-success ms-1';
@@ -221,6 +221,7 @@ function updatePasswordFeedback() {
     }
   } else {
     matchFeedback.textContent = '';
+    matchFeedback.className = 'text-muted';
     matchIcon.className = 'bi ms-1 d-none';
   }
 }
@@ -235,10 +236,11 @@ document.getElementById('crearUsuarioForm').addEventListener('submit', function(
   submitBtn.disabled = true;
   submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando...';
   
-  const password = document.getElementById('id_password').value;
-  const confirmPassword = document.getElementById('id_confirm_password').value;
+  const pwdValue = document.getElementById('id_password').value;
+  const confirmPwdValue = document.getElementById('id_confirm_password').value;
   
-  if (password && password.length < 8) {
+  // Validación local – no se loguea ni se envía la contraseña a servicios externos
+  if (pwdValue && pwdValue.length < 8) {
     e.preventDefault();
     submitBtn.disabled = false;
     submitBtn.innerHTML = '<i class="bi bi-save me-1"></i> {% if user %}Actualizar Usuario{% else %}Crear Usuario{% endif %}';
@@ -251,7 +253,7 @@ document.getElementById('crearUsuarioForm').addEventListener('submit', function(
     return;
   }
   
-  if (password !== confirmPassword) {
+  if (pwdValue !== confirmPwdValue) {
     e.preventDefault();
     submitBtn.disabled = false;
     submitBtn.innerHTML = '<i class="bi bi-save me-1"></i> {% if user %}Actualizar Usuario{% else %}Crear Usuario{% endif %}';
