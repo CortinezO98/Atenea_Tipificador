@@ -92,44 +92,96 @@ def crear_evaluacion(request):
         try:
             with transaction.atomic():
                 numero_doc = (request.POST.get('numero_identificacion') or '').strip()
-                es_anonimo = (request.POST.get('es_anonimo') == '1') or (numero_doc in ('9999', '9999999'))
+                es_anonimo = (
+                    request.POST.get('es_anonimo') == '1'
+                    or numero_doc in ('9999', '9999999')
+                )
 
                 if es_anonimo:
                     ciudadano = get_ciudadano_anonimo()
                 else:
                     cid = request.POST.get('cuidadano_id')
-                    ciu_kwargs = dict(
-                        tipo_identificacion_id=request.POST['tipo_identificacion'],
-                        numero_identificacion=_clean_str(request.POST['numero_identificacion'], 20),
-                        nombre=_clean_str(request.POST['nombre'], 255),
-                        correo=_clean_str(request.POST.get('correo', ''), 254),
-                        telefono=_clean_str(request.POST.get('telefono', ''), 20),
-                        direccion_residencia=_clean_str(request.POST.get('direccion_residencia', ''), 255),
-                        pais_id=(request.POST.get('pais') or None),
-                        ciudad=_clean_str(request.POST.get('ciudad', ''), 255),
-                        sexo_id=request.POST.get('sexo') or None,
-                        genero_id=request.POST.get('genero') or None,
-                        orientacion_id=request.POST.get('orientacion') or None,
-                        tiene_discapacidad_id=request.POST.get('tiene_discapacidad') or None,
-                        discapacidad_id=(
-                            request.POST.get('discapacidad') or None
-                        ) if (request.POST.get('tiene_discapacidad') == '1') else None,
-                        rango_edad_id=request.POST.get('rango_edad') or None,
-                        nivel_educativo_id=request.POST.get('nivel_educativo') or None,
-                        grupo_etnico_id=request.POST.get('grupo_etnico') or None,
-                        grupo_poblacional_id=request.POST.get('grupo_poblacional') or None,
-                        estrato_id=request.POST.get('estrato') or None,
-                        localidad_id=request.POST.get('localidad') or None,
-                        calidad_comunicacion_id=request.POST.get('calidad_comunicacion') or None,
+
+                    tipo_identificacion_id = request.POST['tipo_identificacion']
+                    numero_identificacion = _clean_str(
+                        request.POST['numero_identificacion'], 20
+                    )
+                    nombre = _clean_str(request.POST['nombre'], 255)
+                    correo = _clean_str(request.POST.get('correo', ''), 254)
+                    telefono = _clean_str(request.POST.get('telefono', ''), 20)
+                    direccion_residencia = _clean_str(
+                        request.POST.get('direccion_residencia', ''), 255
+                    )
+                    pais_id = request.POST.get('pais') or None
+                    ciudad = _clean_str(request.POST.get('ciudad', ''), 255)
+                    sexo_id = request.POST.get('sexo') or None
+                    genero_id = request.POST.get('genero') or None
+                    orientacion_id = request.POST.get('orientacion') or None
+                    tiene_discapacidad_id = request.POST.get('tiene_discapacidad') or None
+                    if request.POST.get('tiene_discapacidad') == '1':
+                        discapacidad_id = request.POST.get('discapacidad') or None
+                    else:
+                        discapacidad_id = None
+                    rango_edad_id = request.POST.get('rango_edad') or None
+                    nivel_educativo_id = request.POST.get('nivel_educativo') or None
+                    grupo_etnico_id = request.POST.get('grupo_etnico') or None
+                    grupo_poblacional_id = request.POST.get('grupo_poblacional') or None
+                    estrato_id = request.POST.get('estrato') or None
+                    localidad_id = request.POST.get('localidad') or None
+                    calidad_comunicacion_id = (
+                        request.POST.get('calidad_comunicacion') or None
                     )
 
                     if cid:
                         ciudadano = Ciudadano.objects.get(id=cid)
-                        for field in CIUDADANO_FIELDS:
-                            setattr(ciudadano, field, ciu_kwargs[field])
+
+                        ciudadano.tipo_identificacion_id = tipo_identificacion_id
+                        ciudadano.numero_identificacion = numero_identificacion
+                        ciudadano.nombre = nombre
+                        ciudadano.correo = correo
+                        ciudadano.telefono = telefono
+                        ciudadano.direccion_residencia = direccion_residencia
+                        ciudadano.pais_id = pais_id
+                        ciudadano.ciudad = ciudad
+                        ciudadano.sexo_id = sexo_id
+                        ciudadano.genero_id = genero_id
+                        ciudadano.orientacion_id = orientacion_id
+                        ciudadano.tiene_discapacidad_id = tiene_discapacidad_id
+                        ciudadano.discapacidad_id = discapacidad_id
+                        ciudadano.rango_edad_id = rango_edad_id
+                        ciudadano.nivel_educativo_id = nivel_educativo_id
+                        ciudadano.grupo_etnico_id = grupo_etnico_id
+                        ciudadano.grupo_poblacional_id = grupo_poblacional_id
+                        ciudadano.estrato_id = estrato_id
+                        ciudadano.localidad_id = localidad_id
+                        ciudadano.calidad_comunicacion_id = (
+                            calidad_comunicacion_id
+                        )
+
                         ciudadano.save()
                     else:
-                        ciudadano = Ciudadano.objects.create(**ciu_kwargs)
+                        ciudadano = Ciudadano.objects.create(
+                            tipo_identificacion_id=tipo_identificacion_id,
+                            numero_identificacion=numero_identificacion,
+                            nombre=nombre,
+                            correo=correo,
+                            telefono=telefono,
+                            direccion_residencia=direccion_residencia,
+                            pais_id=pais_id,
+                            ciudad=ciudad,
+                            sexo_id=sexo_id,
+                            genero_id=genero_id,
+                            orientacion_id=orientacion_id,
+                            tiene_discapacidad_id=tiene_discapacidad_id,
+                            discapacidad_id=discapacidad_id,
+                            rango_edad_id=rango_edad_id,
+                            nivel_educativo_id=nivel_educativo_id,
+                            grupo_etnico_id=grupo_etnico_id,
+                            grupo_poblacional_id=grupo_poblacional_id,
+                            estrato_id=estrato_id,
+                            localidad_id=localidad_id,
+                            calidad_comunicacion_id=calidad_comunicacion_id,
+                        )
 
                 categoria_final_id = None
                 for key in ('nivel6', 'nivel5', 'nivel4', 'nivel3', 'nivel2', 'nivel1'):
@@ -138,13 +190,15 @@ def crear_evaluacion(request):
                         categoria_final_id = val
                         break
                 if not categoria_final_id:
-                    raise ValueError("Debes seleccionar al menos una categoría (N1..N6).")
-
-                tel_inconser = (
-                    _clean_str(
-                        request.POST.get('telefono_inconser') or request.POST.get('telefono_inconcer') or '',
-                        20
+                    raise ValueError(
+                        "Debes seleccionar al menos una categoría (N1..N6)."
                     )
+
+                tel_inconser = _clean_str(
+                    request.POST.get('telefono_inconser')
+                    or request.POST.get('telefono_inconcer')
+                    or '',
+                    20,
                 )
 
                 evaluacion = Evaluacion.objects.create(
@@ -152,16 +206,22 @@ def crear_evaluacion(request):
                     observacion=request.POST['observacion'],
                     ciudadano=ciudadano,
                     user=request.user,
-
                     categoria_id=categoria_final_id,
                     tipo_canal_id=(request.POST.get('tipo_canal') or None),
-
-                    segmento=None, segmento_ii=None, segmento_iii=None,
-                    segmento_iv=None, segmento_v=None, segmento_vi=None, tipificacion=None,
-
+                    segmento=None,
+                    segmento_ii=None,
+                    segmento_iii=None,
+                    segmento_iv=None,
+                    segmento_v=None,
+                    segmento_vi=None,
+                    tipificacion=None,
                     es_anonimo=es_anonimo,
-                    contacto_correo=(request.POST.get('correo', '') if es_anonimo else None),
-                    contacto_telefono=(request.POST.get('telefono', '') if es_anonimo else None),
+                    contacto_correo=(
+                        request.POST.get('correo', '') if es_anonimo else None
+                    ),
+                    contacto_telefono=(
+                        request.POST.get('telefono', '') if es_anonimo else None
+                    ),
                     contacto_telefono_inconcer=tel_inconser,
                 )
 
@@ -171,10 +231,12 @@ def crear_evaluacion(request):
                     evaluacion=evaluacion,
                     agente=request.user,
                     idInteraccion=request.POST.get('conversacion_id', ''),
-                    nombreAgente=request.user.get_full_name() or request.user.username,
+                    nombreAgente=(
+                        request.user.get_full_name() or request.user.username
+                    ),
                     token=token,
                     fechaExpiracionLink=expira,
-                    fecha_creacion=now()
+                    fecha_creacion=now(),
                 )
                 encuesta_url = request.build_absolute_uri(
                     reverse('encuesta_publica', kwargs={'token': token})
@@ -194,7 +256,6 @@ def crear_evaluacion(request):
                     'encuesta_token': encuesta.token,
                 }
 
-
                 if settings.DEBUG:
                     print(f"DEBUG - Crear evaluación: {debug_info}")
 
@@ -213,13 +274,16 @@ def crear_evaluacion(request):
                         '<small class="text-muted d-block mt-1 text-center">'
                         'Comparte este enlace para acceder a la evaluación'
                         '</small>',
-                        encuesta_url
-                    )
+                        encuesta_url,
+                    ),
                 )
 
         except Exception as e:
             RegistrarError(inspect.currentframe().f_code.co_name, str(e), request)
-            messages.error(request, f"Ocurrió un error al guardar la evaluación: {str(e)}")
+            messages.error(
+                request,
+                f"Ocurrió un error al guardar la evaluación: {str(e)}",
+            )
         return redirect('index')
 
     tiposIdentificacion = TipoIdentificacion.objects.all()
@@ -230,34 +294,38 @@ def crear_evaluacion(request):
         messages.warning(
             request,
             "Faltan datos mínimos (Tipos de identificación, Países o Niveles). "
-            "Ejecuta los seeders mínimos y vuelve a intentar."
+            "Ejecuta los seeders mínimos y vuelve a intentar.",
         )
         return redirect('index')
 
-    return render(request, 'usuarios/evaluaciones/crear_evaluacion.html', {
-        'tiposIdentificacion': tiposIdentificacion,
-        'paises': paises,
-        'is_supervisor': (
-            ValidarRolUsuario(request, Roles.SUPERVISOR.value)
-            or ValidarRolUsuario(request, Roles.ADMINISTRADOR.value)
-        ),
-        'is_agente': ValidarRolUsuario(request, Roles.AGENTE.value),
-        'is_admin': ValidarRolUsuario(request, Roles.ADMINISTRADOR.value),
-        'numero_anonimo': '9999999',
-        'sexos': Sexo.objects.all(),
-        'generos': Genero.objects.all(),
-        'orientaciones': OrientacionSexual.objects.all(),
-        'tiene_discapacidades': TieneDiscapacidad.objects.all(),
-        'discapacidades': Discapacidad.objects.all(),
-        'rangos_edad': RangoEdad.objects.all(),
-        'niveles_educativos': NivelEducativo.objects.all(),
-        'grupos_etnicos': GrupoEtnico.objects.all(),
-        'grupos_poblacionales': GrupoPoblacional.objects.all(),
-        'estratos': Estrato.objects.all(),
-        'localidades': Localidad.objects.all(),
-        'calidades': CalidadComunicacion.objects.all(),
-        'tipos_canal': TipoCanal.objects.all(),
-    })
+    return render(
+        request,
+        'usuarios/evaluaciones/crear_evaluacion.html',
+        {
+            'tiposIdentificacion': tiposIdentificacion,
+            'paises': paises,
+            'is_supervisor': (
+                ValidarRolUsuario(request, Roles.SUPERVISOR.value)
+                or ValidarRolUsuario(request, Roles.ADMINISTRADOR.value)
+            ),
+            'is_agente': ValidarRolUsuario(request, Roles.AGENTE.value),
+            'is_admin': ValidarRolUsuario(request, Roles.ADMINISTRADOR.value),
+            'numero_anonimo': '9999999',
+            'sexos': Sexo.objects.all(),
+            'generos': Genero.objects.all(),
+            'orientaciones': OrientacionSexual.objects.all(),
+            'tiene_discapacidades': TieneDiscapacidad.objects.all(),
+            'discapacidades': Discapacidad.objects.all(),
+            'rangos_edad': RangoEdad.objects.all(),
+            'niveles_educativos': NivelEducativo.objects.all(),
+            'grupos_etnicos': GrupoEtnico.objects.all(),
+            'grupos_poblacionales': GrupoPoblacional.objects.all(),
+            'estratos': Estrato.objects.all(),
+            'localidades': Localidad.objects.all(),
+            'calidades': CalidadComunicacion.objects.all(),
+            'tipos_canal': TipoCanal.objects.all(),
+        },
+    )
 
 
 @login_required
