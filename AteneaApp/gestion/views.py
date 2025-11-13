@@ -502,26 +502,6 @@ def xl_safe(v):
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value, Roles.SUPERVISOR.value])
 def exportar_excel(request):
-    """
-    Exporta a Excel las evaluaciones visibles para el rol actual.
-    Solo Administrador y Supervisor pueden acceder a esta vista.
-    """
-
-    if not (
-        ValidarRolUsuario(request, Roles.ADMINISTRADOR.value)
-        or ValidarRolUsuario(request, Roles.SUPERVISOR.value)
-    ):
-        RegistrarError(
-            'exportar_excel',
-            'Acceso no autorizado a exportación de reportes',
-            request
-        )
-        messages.error(
-            request,
-            'No está autorizado para exportar reportes.'
-        )
-        return redirect('reportes_view')
-
     quick        = request.GET.get('quick')
     hoy_flag     = request.GET.get('hoy') == '1'
     fecha_inicio = request.GET.get('fecha_inicio')
@@ -535,7 +515,7 @@ def exportar_excel(request):
             'ciudadano__tipo_identificacion',
             'ciudadano__pais',
 
-            # ===== evitar N+1 en caracterización =====
+            # ===== NUEVO: evitar N+1 en caracterización =====
             'ciudadano__sexo',
             'ciudadano__genero',
             'ciudadano__orientacion',
@@ -575,15 +555,13 @@ def exportar_excel(request):
             ff = make_aware(datetime.strptime(fecha_fin,    fmt))
             qs = qs.filter(fecha__range=(fi, ff))
         except ValueError:
-            # Si las fechas vienen mal formateadas, simplemente no filtramos por rango
             pass
     else:
-        # Por defecto, si no hay filtros de usuario/canal, limitamos al día de hoy
         if not (usuario and str(usuario).isdigit()) and not (canal and str(canal).isdigit()):
             start, end, _ = get_quick_range('hoy')
             qs = qs.filter(fecha__range=(start, end))
 
-    # Filtros adicionales (usuario y canal) con validación básica
+    # Filtros adicionales
     if usuario and str(usuario).isdigit():
         qs = qs.filter(user_id=int(usuario))
     if canal and str(canal).isdigit():
@@ -706,10 +684,7 @@ def exportar_excel(request):
             escala_vals = []
             txt_pairs = []
             for r in respuestas:
-                ptxt = (
-                    getattr(r.pregunta, 'texto', f'Pregunta {r.pregunta_id}')
-                    if hasattr(r, 'pregunta') else f'Pregunta {r.pregunta_id}'
-                )
+                ptxt = getattr(r.pregunta, 'texto', f'Pregunta {r.pregunta_id}') if hasattr(r, 'pregunta') else f'Pregunta {r.pregunta_id}'
                 txt_pairs.append(f"{ptxt}: {r.valor}")
                 try:
                     if getattr(r.pregunta, 'tipo', '') == 'escala' and str(r.valor).isdigit():
@@ -746,21 +721,13 @@ def exportar_excel(request):
             getattr(ciu.estrato, 'nombre', ''),
             getattr(ciu.localidad, 'nombre', ''),
             getattr(ciu.calidad_comunicacion, 'nombre', ''),
-
-            # Contactos
             ev.contacto_correo or '',
             ev.contacto_telefono or '',
             ev.contacto_telefono_inconcer or '',
-
-            # Conversación y tipificación
             ev.conversacion_id,
             n1, n2, n3, n4, n5, n6, nivel_final,
-
-            # Encuesta
             enc_estado, enc_resp_en, enc_token, enc_url,
             enc_prom_escala, enc_respuestas_txt,
-
-            # Otros
             getattr(ev.tipo_canal, 'nombre', ''),
             ev.observacion,
             ev.user.username
@@ -784,10 +751,7 @@ def exportar_excel(request):
         wb.save(buffer)
     except Exception as e:
         RegistrarError('exportar_excel', str(e), request)
-        messages.error(
-            request,
-            'No se pudo generar el Excel. Soporte ha sido notificado.'
-        )
+        messages.error(request, 'No se pudo generar el Excel. Soporte ha sido notificado.')
         return redirect('reportes_view')
 
     buffer.seek(0)
@@ -795,11 +759,8 @@ def exportar_excel(request):
         buffer,
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-    resp['Content-Disposition'] = (
-        'attachment; filename="reportes_niveles_encuesta.xlsx"'
-    )
+    resp['Content-Disposition'] = 'attachment; filename="reportes_niveles_encuesta.xlsx"'
     return resp
-
 
 @csrf_exempt   
 def encuesta_publica(request, token):
