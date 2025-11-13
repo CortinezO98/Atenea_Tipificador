@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from dotenv import load_dotenv
 from pathlib import Path
 import os
+from django.core.exceptions import ImproperlyConfigured
+from django.core.management.utils import get_random_secret_key
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -24,8 +26,15 @@ IN_PRODUCTION = ENV_APP != 'local'
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-g92ofvy03gl(f+nkm4jt03ypz=uxb1+ixtd($6h*l3c+mt&f*6'
+SECRET_KEY = os.environ.get("SECRET_KEY")
+
+if not SECRET_KEY:
+    if IN_PRODUCTION:
+        raise ImproperlyConfigured("SECRET_KEY no está definido en variables de entorno.")
+    SECRET_KEY = os.environ.get("DEV_SECRET_KEY", get_random_secret_key())
+
+old = os.environ.get("SECRET_KEY_OLD")
+SECRET_KEY_FALLBACKS = [old] if old else []
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = not IN_PRODUCTION
@@ -167,7 +176,16 @@ LOGIN_URL = '/'
 LOGIN_REDIRECT_URL = '/'
 
 # Seguridad HTTPS
-SECURE_SSL_REDIRECT = False
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
-SECURE_HSTS_SECONDS = 0 
+if IN_PRODUCTION:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+else:
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_HSTS_SECONDS = 0
