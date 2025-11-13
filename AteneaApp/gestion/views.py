@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
@@ -22,6 +23,7 @@ import inspect
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.html import format_html 
+import inspect
 from .forms import build_encuesta_form
 
 def index(request):
@@ -36,6 +38,44 @@ def index(request):
         return redirect('logout')
     else:
         return redirect('login')
+
+
+
+def _clean_str(value, max_len=None):
+    """
+    Normaliza strings desde request:
+    - Convierte None a ''
+    - Hace strip
+    - (Opcional) corta a max_len
+    """
+    v = (value or '').strip()
+    if max_len is not None:
+        return v[:max_len]
+    return v
+
+
+CIUDADANO_FIELDS = (
+    'tipo_identificacion_id',
+    'numero_identificacion',
+    'nombre',
+    'correo',
+    'telefono',
+    'direccion_residencia',
+    'pais_id',
+    'ciudad',
+    'sexo_id',
+    'genero_id',
+    'orientacion_id',
+    'tiene_discapacidad_id',
+    'discapacidad_id',
+    'rango_edad_id',
+    'nivel_educativo_id',
+    'grupo_etnico_id',
+    'grupo_poblacional_id',
+    'estrato_id',
+    'localidad_id',
+    'calidad_comunicacion_id',
+)
 
 
 @login_required
@@ -60,19 +100,20 @@ def crear_evaluacion(request):
                     cid = request.POST.get('cuidadano_id')
                     ciu_kwargs = dict(
                         tipo_identificacion_id=request.POST['tipo_identificacion'],
-                        numero_identificacion=request.POST['numero_identificacion'],
-                        nombre=request.POST['nombre'],
-                        correo=request.POST.get('correo', ''),
-                        telefono=request.POST.get('telefono', ''),
-                        direccion_residencia=request.POST.get('direccion_residencia', ''),
+                        numero_identificacion=_clean_str(request.POST['numero_identificacion'], 20),
+                        nombre=_clean_str(request.POST['nombre'], 255),
+                        correo=_clean_str(request.POST.get('correo', ''), 254),
+                        telefono=_clean_str(request.POST.get('telefono', ''), 20),
+                        direccion_residencia=_clean_str(request.POST.get('direccion_residencia', ''), 255),
                         pais_id=(request.POST.get('pais') or None),
-                        ciudad=request.POST.get('ciudad', ''),
+                        ciudad=_clean_str(request.POST.get('ciudad', ''), 255),
                         sexo_id=request.POST.get('sexo') or None,
                         genero_id=request.POST.get('genero') or None,
                         orientacion_id=request.POST.get('orientacion') or None,
                         tiene_discapacidad_id=request.POST.get('tiene_discapacidad') or None,
-                        discapacidad_id=(request.POST.get('discapacidad') or None)
-                            if (request.POST.get('tiene_discapacidad') == '1') else None,
+                        discapacidad_id=(
+                            request.POST.get('discapacidad') or None
+                        ) if (request.POST.get('tiene_discapacidad') == '1') else None,
                         rango_edad_id=request.POST.get('rango_edad') or None,
                         nivel_educativo_id=request.POST.get('nivel_educativo') or None,
                         grupo_etnico_id=request.POST.get('grupo_etnico') or None,
@@ -84,8 +125,8 @@ def crear_evaluacion(request):
 
                     if cid:
                         ciudadano = Ciudadano.objects.get(id=cid)
-                        for k, v in ciu_kwargs.items():
-                            setattr(ciudadano, k, v)
+                        for field in CIUDADANO_FIELDS:
+                            setattr(ciudadano, field, ciu_kwargs[field])
                         ciudadano.save()
                     else:
                         ciudadano = Ciudadano.objects.create(**ciu_kwargs)
@@ -99,7 +140,13 @@ def crear_evaluacion(request):
                 if not categoria_final_id:
                     raise ValueError("Debes seleccionar al menos una categoría (N1..N6).")
 
-                tel_inconser = request.POST.get('telefono_inconser') or request.POST.get('telefono_inconcer') or ''
+                tel_inconser = (
+                    _clean_str(
+                        request.POST.get('telefono_inconser') or request.POST.get('telefono_inconcer') or '',
+                        20
+                    )
+                )
+
                 evaluacion = Evaluacion.objects.create(
                     conversacion_id=request.POST['conversacion_id'],
                     observacion=request.POST['observacion'],
@@ -129,7 +176,9 @@ def crear_evaluacion(request):
                     fechaExpiracionLink=expira,
                     fecha_creacion=now()
                 )
-                encuesta_url = request.build_absolute_uri(reverse('encuesta_publica', kwargs={'token': token}))
+                encuesta_url = request.build_absolute_uri(
+                    reverse('encuesta_publica', kwargs={'token': token})
+                )
 
                 debug_info = {
                     'nivel1': request.POST.get('nivel1'),
@@ -144,7 +193,10 @@ def crear_evaluacion(request):
                     'telefono_inconcer': tel_inconser,
                     'encuesta_token': encuesta.token,
                 }
-                print(f"DEBUG - Crear evaluación: {debug_info}")
+
+
+                if settings.DEBUG:
+                    print(f"DEBUG - Crear evaluación: {debug_info}")
 
                 messages.success(
                     request,
@@ -158,7 +210,9 @@ def crear_evaluacion(request):
                         '<div class="mt-2 p-2 bg-light rounded">'
                         '<code class="text-break small d-block">{}</code>'
                         '</div>'
-                        '<small class="text-muted d-block mt-1 text-center">Comparte este enlace para acceder a la evaluación</small>',
+                        '<small class="text-muted d-block mt-1 text-center">'
+                        'Comparte este enlace para acceder a la evaluación'
+                        '</small>',
                         encuesta_url
                     )
                 )
