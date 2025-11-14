@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect
+from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
+from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse
 from django.contrib import messages
 from django.db import transaction
@@ -10,9 +12,12 @@ from django.views.decorators.http import require_GET
 from django.utils.timezone import now, make_aware, localtime
 from django.utils.crypto import get_random_string
 from django.urls import reverse
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.html import format_html
+
 from usuarios.views import ValidarRolUsuario, en_grupo
 from usuarios.enums import Roles
-from .models import *
+from .models import *  # noqa
 from .utils import RegistrarError, get_ciudadano_anonimo
 from io import BytesIO
 from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
@@ -20,11 +25,9 @@ from datetime import datetime, timedelta
 import openpyxl
 from openpyxl.utils import get_column_letter
 import inspect
-from django.shortcuts import get_object_or_404
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.html import format_html 
-import inspect
-from .forms import build_encuesta_form
+from .forms import build_encuesta_form  # noqa
+import re
+
 
 def index(request):
     if request.user.is_authenticated:
@@ -40,7 +43,6 @@ def index(request):
         return redirect('login')
 
 
-
 def _clean_str(value, max_len=None):
     """
     Normaliza strings desde request:
@@ -52,6 +54,44 @@ def _clean_str(value, max_len=None):
     if max_len is not None:
         return v[:max_len]
     return v
+
+
+def _build_public_url(path: str) -> str:
+    """
+    Construye una URL absoluta sobre una base confiable (SITE_URL),
+    evitando depender de cabeceras controladas por el cliente
+    (Host) como hace build_absolute_uri.
+
+    Si SITE_URL no está configurado, retorna el path relativo.
+    """
+    base = getattr(settings, "SITE_URL", "").strip()
+    if base:
+        return f"{base.rstrip('/')}{path}"
+    return path
+
+
+def _is_admin_or_supervisor(user) -> bool:
+    return (
+        user.is_superuser
+        or user.groups.filter(name__in=['Administrador', 'Supervisor']).exists()
+    )
+
+
+def _is_agente(user) -> bool:
+    return user.groups.filter(name='Agente').exists()
+
+
+def _require_roles(user, allowed_group_names):
+    """
+    Verificación explícita de autorización por rol/grupo.
+    Ayuda a cerrar findings de Function Level Authorization.
+    """
+    if not user.is_authenticated:
+        raise PermissionDenied("Autenticación requerida.")
+    if user.is_superuser:
+        return
+    if not user.groups.filter(name__in=allowed_group_names).exists():
+        raise PermissionDenied("No tiene permisos para esta operación.")
 
 
 CIUDADANO_FIELDS = (
@@ -87,7 +127,13 @@ def crear_evaluacion(request):
       - Guarda categoría final (árbol N1..N6)
       - Guarda tipo_canal_id
       - Crea encuesta asociada
+
+    Autorización:
+      - Acceso sólo para usuarios en grupos: Administrador, Supervisor, Agente.
     """
+    # Refuerzo explícito de autorización (Function Level Auth)
+    _require_roles(request.user, ['Administrador', 'Supervisor', 'Agente'])
+
     if request.method == 'POST':
         try:
             with transaction.atomic():
@@ -118,10 +164,12 @@ def crear_evaluacion(request):
                     genero_id = request.POST.get('genero') or None
                     orientacion_id = request.POST.get('orientacion') or None
                     tiene_discapacidad_id = request.POST.get('tiene_discapacidad') or None
+
                     if request.POST.get('tiene_discapacidad') == '1':
                         discapacidad_id = request.POST.get('discapacidad') or None
                     else:
                         discapacidad_id = None
+
                     rango_edad_id = request.POST.get('rango_edad') or None
                     nivel_educativo_id = request.POST.get('nivel_educativo') or None
                     grupo_etnico_id = request.POST.get('grupo_etnico') or None
@@ -133,6 +181,8 @@ def crear_evaluacion(request):
                     )
 
                     if cid:
+                        # No hay restricción por "dueño" de ciudadano a nivel de negocio:
+                        # todos los roles autorizados pueden actualizarlo.
                         ciudadano = Ciudadano.objects.get(id=cid)
 
                         ciudadano.tipo_identificacion_id = tipo_identificacion_id
@@ -238,9 +288,10 @@ def crear_evaluacion(request):
                     fechaExpiracionLink=expira,
                     fecha_creacion=now(),
                 )
-                encuesta_url = request.build_absolute_uri(
-                    reverse('encuesta_publica', kwargs={'token': token})
-                )
+
+                # URL construida desde base confiable (SITE_URL) en lugar de build_absolute_uri
+                encuesta_path = reverse('encuesta_publica', kwargs={'token': token})
+                encuesta_url = _build_public_url(encuesta_path)
 
                 debug_info = {
                     'nivel1': request.POST.get('nivel1'),
@@ -335,7 +386,13 @@ def buscar_tipificacion(request):
     Busca Evaluacion(es) por número de identificación del ciudadano,
     correo/teléfono de contacto guardados en la Evaluación (anónimo),
     y correo/teléfono del Ciudadano (no anónimo / legacy).
+
+    Object Level Auth:
+      - Agente: sólo ve sus propias evaluaciones.
+      - Supervisor / Administrador: ven todas.
     """
+    _require_roles(request.user, ['Administrador', 'Supervisor', 'Agente'])
+
     query = (request.GET.get('q') or '').strip()
     evaluaciones = Evaluacion.objects.none()
     paginator = None
@@ -368,6 +425,10 @@ def buscar_tipificacion(request):
             )
             .order_by('-fecha')
         )
+
+        # Object Level Authorization: Agente sólo ve lo suyo
+        if _is_agente(request.user) and not _is_admin_or_supervisor(request.user):
+            qs = qs.filter(user=request.user)
 
         paginator = Paginator(qs, 10)
         page_number = request.GET.get('page') or 1
@@ -407,6 +468,15 @@ def get_quick_range(quick: str):
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value, Roles.SUPERVISOR.value, Roles.AGENTE.value])
 def reportes_view(request):
+    """
+    Vista de reportes de evaluaciones.
+
+    Object Level Auth:
+      - Agente: sólo ve los suyos.
+      - Supervisor / Administrador: ven todo.
+    """
+    _require_roles(request.user, ['Administrador', 'Supervisor', 'Agente'])
+
     quick = request.GET.get('quick')
     fecha_inicio = request.GET.get('fecha_inicio')
     fecha_fin = request.GET.get('fecha_fin')
@@ -452,17 +522,29 @@ def reportes_view(request):
         qs = qs.filter(fecha__range=(start, end))
         quick = 'hoy'
 
-    if usuario_id and str(usuario_id).isdigit():
-        qs = qs.filter(user_id=int(usuario_id))
+    # Object Level Authorization en nivel de reporte:
+    # - Agente: forzamos a que sólo vea sus propias evaluaciones
+    if _is_agente(request.user) and not _is_admin_or_supervisor(request.user):
+        qs = qs.filter(user=request.user)
+        usuario_id = None  # ignoramos filtros por otros usuarios
+    else:
+        if usuario_id and str(usuario_id).isdigit():
+            qs = qs.filter(user_id=int(usuario_id))
+
     if canal_id and str(canal_id).isdigit():
         qs = qs.filter(tipo_canal_id=int(canal_id))
 
-    usuarios = User.objects.filter(groups__name__in=['Agente', 'Supervisor', 'Administrador']).distinct()
+    usuarios = User.objects.filter(
+        groups__name__in=['Agente', 'Supervisor', 'Administrador']
+    ).distinct()
     canales = TipoCanal.objects.all()
 
     base = Evaluacion.objects.all()
-    if usuario_id and str(usuario_id).isdigit():
-        base = base.filter(user_id=int(usuario_id))
+    if _is_agente(request.user) and not _is_admin_or_supervisor(request.user):
+        base = base.filter(user=request.user)
+    else:
+        if usuario_id and str(usuario_id).isdigit():
+            base = base.filter(user_id=int(usuario_id))
     if canal_id and str(canal_id).isdigit():
         base = base.filter(tipo_canal_id=int(canal_id))
 
@@ -502,6 +584,16 @@ def xl_safe(v):
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value, Roles.SUPERVISOR.value])
 def exportar_excel(request):
+    """
+    Exporta reportes a Excel.
+
+    Function & Object Level Auth:
+      - Sólo Administrador y Supervisor pueden exportar.
+      - Si el usuario fuese Agente (no debería entrar por el decorador),
+        igualmente estaría bloqueado por _require_roles.
+    """
+    _require_roles(request.user, ['Administrador', 'Supervisor'])
+
     quick        = request.GET.get('quick')
     hoy_flag     = request.GET.get('hoy') == '1'
     fecha_inicio = request.GET.get('fecha_inicio')
@@ -515,7 +607,7 @@ def exportar_excel(request):
             'ciudadano__tipo_identificacion',
             'ciudadano__pais',
 
-            # ===== NUEVO: evitar N+1 en caracterización =====
+            # ===== evitar N+1 en caracterización =====
             'ciudadano__sexo',
             'ciudadano__genero',
             'ciudadano__orientacion',
@@ -533,7 +625,7 @@ def exportar_excel(request):
             'categoria__tipificacion',
             'categoria__categoria_padre',
             'user',
-            'tipo_canal',  # para nombre del canal
+            'tipo_canal',
             'segmento', 'segmento_ii', 'segmento_iii',
             'segmento_iv', 'segmento_v', 'segmento_vi', 'tipificacion',
         )
@@ -561,7 +653,7 @@ def exportar_excel(request):
             start, end, _ = get_quick_range('hoy')
             qs = qs.filter(fecha__range=(start, end))
 
-    # Filtros adicionales
+    # Filtros adicionales (solo supervisores/admin pueden filtrar por usuario libremente)
     if usuario and str(usuario).isdigit():
         qs = qs.filter(user_id=int(usuario))
     if canal and str(canal).isdigit():
@@ -577,7 +669,7 @@ def exportar_excel(request):
         'Correo', 'Teléfono',
         'País', 'Ciudad', 'Dirección',
 
-        # === BLOQUE CIUDADANO: CARACTERIZACIÓN (ahora junto al ciudadano) ===
+        # === BLOQUE CIUDADANO: CARACTERIZACIÓN ===
         'Sexo','Género','Orientación Sexual','Tiene Discapacidad','Discapacidad',
         'Rango de Edad','Nivel Educativo','Grupo Étnico','Grupo Poblacional',
         'Estrato','Localidad','Calidad Comunicación',
@@ -603,7 +695,6 @@ def exportar_excel(request):
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
 
-    # Imports locales
     from .models import Encuesta, RespuestaEncuesta
 
     for row_idx, ev in enumerate(qs.iterator(), start=2):
@@ -668,9 +759,8 @@ def exportar_excel(request):
 
             enc_token = encuesta.token or ''
             try:
-                enc_url = request.build_absolute_uri(
-                    reverse('encuesta_publica', kwargs={'token': encuesta.token})
-                )
+                encuesta_path = reverse('encuesta_publica', kwargs={'token': encuesta.token})
+                enc_url = _build_public_url(encuesta_path)
             except Exception:
                 enc_url = ''
 
@@ -708,7 +798,7 @@ def exportar_excel(request):
             ciu.ciudad or '',
             ciu.direccion_residencia or '',
 
-            # === CARACTERIZACIÓN (pegada al ciudadano) ===
+            # === CARACTERIZACIÓN ===
             getattr(ciu.sexo, 'nombre', ''),
             getattr(ciu.genero, 'nombre', ''),
             getattr(ciu.orientacion, 'nombre', ''),
@@ -762,9 +852,26 @@ def exportar_excel(request):
     resp['Content-Disposition'] = 'attachment; filename="reportes_niveles_encuesta.xlsx"'
     return resp
 
-@csrf_exempt   
+
+@csrf_exempt
 def encuesta_publica(request, token):
+    """
+    Encuesta pública de satisfacción.
+
+    Diseño de seguridad:
+      - Acceso sin autenticación (público) por requerimiento de negocio.
+      - Autorización basada en token de 24 caracteres alfanuméricos
+        generado aleatoriamente (no predecible).
+      - Esto es un caso de Object Level Access Control basado en secreto.
+    """
+
+    # Validación del formato del token para reducir superficie de ataque
+    if not re.fullmatch(r'[A-Za-z0-9]{24}', str(token)):
+        # Evita que IDs arbitrarios (paths raros) lleguen a la consulta
+        return render(request, 'usuarios/encuestas/expirada.html', status=404)
+
     encuesta = get_object_or_404(Encuesta, token=token)
+
     if encuesta.cerrada:
         if encuesta.expirada:
             return render(request, 'usuarios/encuestas/expirada.html', {'encuesta': encuesta})
@@ -795,8 +902,8 @@ def encuesta_publica(request, token):
             RespuestaEncuesta.objects.update_or_create(
                 encuesta=encuesta, pregunta=p, defaults={'valor': val}
             )
-        
-        encuesta.respondida_en = timezone.now()
+
+        encuesta.respondida_en = now()
         encuesta.save()
 
         return render(request, 'usuarios/encuestas/gracias.html', {'encuesta': encuesta})
