@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpResponse, HttpResponseForbidden
+from django.shortcuts import render, redirect
+from django.http import HttpResponse
 from django.contrib import messages
 from django.db import transaction
 from django.core.paginator import Paginator
@@ -19,10 +19,12 @@ from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from datetime import datetime, timedelta
 import openpyxl
 from openpyxl.utils import get_column_letter
-from django.views.decorators.csrf import csrf_exempt  # puedes dejarlo si lo usas en otras vistas
-from django.utils.html import format_html
+import inspect
+from django.shortcuts import get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.html import format_html 
+import inspect
 from .forms import build_encuesta_form
-
 
 def index(request):
     if request.user.is_authenticated:
@@ -36,6 +38,7 @@ def index(request):
         return redirect('logout')
     else:
         return redirect('login')
+
 
 
 def _clean_str(value, max_len=None):
@@ -85,17 +88,6 @@ def crear_evaluacion(request):
       - Guarda tipo_canal_id
       - Crea encuesta asociada
     """
-    # Refuerzo explícito de autorización (además del decorator)
-    if not (
-        request.user.is_authenticated and
-        (
-            ValidarRolUsuario(request, Roles.ADMINISTRADOR.value) or
-            ValidarRolUsuario(request, Roles.SUPERVISOR.value) or
-            ValidarRolUsuario(request, Roles.AGENTE.value)
-        )
-    ):
-        return HttpResponseForbidden("No autorizado.")
-
     if request.method == 'POST':
         try:
             with transaction.atomic():
@@ -344,17 +336,6 @@ def buscar_tipificacion(request):
     correo/teléfono de contacto guardados en la Evaluación (anónimo),
     y correo/teléfono del Ciudadano (no anónimo / legacy).
     """
-    # Refuerzo explícito de autorización (para el scanner)
-    if not (
-        request.user.is_authenticated and
-        (
-            ValidarRolUsuario(request, Roles.ADMINISTRADOR.value) or
-            ValidarRolUsuario(request, Roles.SUPERVISOR.value) or
-            ValidarRolUsuario(request, Roles.AGENTE.value)
-        )
-    ):
-        return HttpResponseForbidden("No autorizado.")
-
     query = (request.GET.get('q') or '').strip()
     evaluaciones = Evaluacion.objects.none()
     paginator = None
@@ -426,17 +407,6 @@ def get_quick_range(quick: str):
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value, Roles.SUPERVISOR.value, Roles.AGENTE.value])
 def reportes_view(request):
-    # Refuerzo de autorización
-    if not (
-        request.user.is_authenticated and
-        (
-            ValidarRolUsuario(request, Roles.ADMINISTRADOR.value) or
-            ValidarRolUsuario(request, Roles.SUPERVISOR.value) or
-            ValidarRolUsuario(request, Roles.AGENTE.value)
-        )
-    ):
-        return HttpResponseForbidden("No autorizado.")
-
     quick = request.GET.get('quick')
     fecha_inicio = request.GET.get('fecha_inicio')
     fecha_fin = request.GET.get('fecha_fin')
@@ -532,16 +502,6 @@ def xl_safe(v):
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value, Roles.SUPERVISOR.value])
 def exportar_excel(request):
-    # Refuerzo de autorización para scanner
-    if not (
-        request.user.is_authenticated and
-        (
-            ValidarRolUsuario(request, Roles.ADMINISTRADOR.value) or
-            ValidarRolUsuario(request, Roles.SUPERVISOR.value)
-        )
-    ):
-        return HttpResponseForbidden("No autorizado.")
-
     quick        = request.GET.get('quick')
     hoy_flag     = request.GET.get('hoy') == '1'
     fecha_inicio = request.GET.get('fecha_inicio')
@@ -554,6 +514,8 @@ def exportar_excel(request):
         .select_related(
             'ciudadano__tipo_identificacion',
             'ciudadano__pais',
+
+            # ===== NUEVO: evitar N+1 en caracterización =====
             'ciudadano__sexo',
             'ciudadano__genero',
             'ciudadano__orientacion',
@@ -566,16 +528,19 @@ def exportar_excel(request):
             'ciudadano__estrato',
             'ciudadano__localidad',
             'ciudadano__calidad_comunicacion',
+
+            # Relaciones ya existentes
             'categoria__tipificacion',
             'categoria__categoria_padre',
             'user',
-            'tipo_canal',
+            'tipo_canal',  # para nombre del canal
             'segmento', 'segmento_ii', 'segmento_iii',
             'segmento_iv', 'segmento_v', 'segmento_vi', 'tipificacion',
         )
         .order_by('-fecha')
     )
 
+    # Filtros de fechas
     if quick in ('hoy', 'ayer', '7d') or hoy_flag:
         use_quick = quick or 'hoy'
         start, end, _ = get_quick_range(use_quick)
@@ -596,11 +561,13 @@ def exportar_excel(request):
             start, end, _ = get_quick_range('hoy')
             qs = qs.filter(fecha__range=(start, end))
 
+    # Filtros adicionales
     if usuario and str(usuario).isdigit():
         qs = qs.filter(user_id=int(usuario))
     if canal and str(canal).isdigit():
         qs = qs.filter(tipo_canal_id=int(canal))
 
+    # ---- Excel (1 sola hoja) ----
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Reportes"
@@ -609,14 +576,26 @@ def exportar_excel(request):
         'Fecha', 'Tipo Documento', 'Número ID', 'Nombre',
         'Correo', 'Teléfono',
         'País', 'Ciudad', 'Dirección',
+
+        # === BLOQUE CIUDADANO: CARACTERIZACIÓN (ahora junto al ciudadano) ===
         'Sexo','Género','Orientación Sexual','Tiene Discapacidad','Discapacidad',
         'Rango de Edad','Nivel Educativo','Grupo Étnico','Grupo Poblacional',
         'Estrato','Localidad','Calidad Comunicación',
+
+        # Contactos de anónimo / externos
         'Correo contacto', 'Teléfono contacto', 'Teléfono Inconcer',
+
+        # Conversación
         'ID Conversación',
+
+        # SOLO NIVELES
         'Nivel 1', 'Nivel 2', 'Nivel 3', 'Nivel 4', 'Nivel 5', 'Nivel 6', 'Nivel Final',
+
+        # ENCUESTA
         'Encuesta estado', 'Encuesta respondida en', 'Encuesta token', 'Encuesta URL',
         'Encuesta promedio (escala 1-5)', 'Encuesta respuestas (texto)',
+
+        # Otros
         'Tipo de Canal',
         'Observación',
         'Usuario'
@@ -624,6 +603,7 @@ def exportar_excel(request):
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
 
+    # Imports locales
     from .models import Encuesta, RespuestaEncuesta
 
     for row_idx, ev in enumerate(qs.iterator(), start=2):
@@ -635,6 +615,7 @@ def exportar_excel(request):
         telf_contacto   = ev.contacto_telefono or ''
         telf_inconser   = ev.contacto_telefono_inconcer or ''
 
+        # --- Reconstruir N1..N6 desde ev.categoria ---
         n1 = n2 = n3 = n4 = n5 = n6 = ''
         nivel_final = 'Sin categoría'
         if ev.categoria:
@@ -654,6 +635,7 @@ def exportar_excel(request):
                     nivel_final = f"Nivel {k}"
                     break
 
+        # --- Encuesta de satisfacción (misma fila) ---
         encuesta = (
             Encuesta.objects
             .filter(evaluacion=ev)
@@ -715,6 +697,7 @@ def exportar_excel(request):
             enc_respuestas_txt = " | ".join(txt_pairs) if txt_pairs else ''
 
         data = [
+            # Fecha y ciudadano básico
             localtime(ev.fecha).strftime('%Y-%m-%d %H:%M'),
             ciu.tipo_identificacion.nombre,
             ciu.numero_identificacion,
@@ -724,6 +707,8 @@ def exportar_excel(request):
             ciu.pais.nombre if ciu.pais else '',
             ciu.ciudad or '',
             ciu.direccion_residencia or '',
+
+            # === CARACTERIZACIÓN (pegada al ciudadano) ===
             getattr(ciu.sexo, 'nombre', ''),
             getattr(ciu.genero, 'nombre', ''),
             getattr(ciu.orientacion, 'nombre', ''),
@@ -750,6 +735,7 @@ def exportar_excel(request):
         for col, value in enumerate(data, 1):
             ws.cell(row=row_idx, column=col, value=xl_safe(value))
 
+    # Autosize básico
     col_widths = [len(h) + 2 for h in headers]
     for r in ws.iter_rows(min_row=2, max_row=ws.max_row, max_col=len(headers)):
         for i, cell in enumerate(r):
@@ -776,16 +762,9 @@ def exportar_excel(request):
     resp['Content-Disposition'] = 'attachment; filename="reportes_niveles_encuesta.xlsx"'
     return resp
 
-
+@csrf_exempt   
 def encuesta_publica(request, token):
-    """
-    Endpoint público de encuesta:
-    - Autenticación por token aleatorio de un solo uso
-    - CSRF protegido mediante el middleware estándar de Django
-      (asegúrate de tener {% csrf_token %} en el formulario HTML).
-    """
     encuesta = get_object_or_404(Encuesta, token=token)
-
     if encuesta.cerrada:
         if encuesta.expirada:
             return render(request, 'usuarios/encuestas/expirada.html', {'encuesta': encuesta})
@@ -816,8 +795,8 @@ def encuesta_publica(request, token):
             RespuestaEncuesta.objects.update_or_create(
                 encuesta=encuesta, pregunta=p, defaults={'valor': val}
             )
-
-        encuesta.respondida_en = now()
+        
+        encuesta.respondida_en = timezone.now()
         encuesta.save()
 
         return render(request, 'usuarios/encuestas/gracias.html', {'encuesta': encuesta})
