@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 import openpyxl
 from openpyxl.utils import get_column_letter
 import inspect
-from django.views.decorators.csrf import csrf_exempt  # puedes dejarlo si lo usas en otros lados
+from django.views.decorators.csrf import csrf_protect
 from django.utils.html import format_html
 from .forms import build_encuesta_form
 
@@ -87,6 +87,13 @@ def crear_evaluacion(request):
       - Guarda categoría final (árbol N1..N6)
       - Guarda tipo_canal_id
       - Crea encuesta asociada
+
+    Function-Level Authorization:
+      - Solo Administrador / Supervisor / Agente.
+
+    Object-Level Authorization:
+      - Se valida el id de ciudadano contra tipo_identificacion y número para evitar
+        que un usuario manipule el id y edite registros de terceros.
     """
     is_admin = ValidarRolUsuario(request, Roles.ADMINISTRADOR.value)
     is_supervisor = ValidarRolUsuario(request, Roles.SUPERVISOR.value)
@@ -351,6 +358,9 @@ def buscar_tipificacion(request):
     Busca Evaluacion(es) por número de identificación del ciudadano,
     correo/teléfono de contacto guardados en la Evaluación (anónimo),
     y correo/telefoneo del Ciudadano (no anónimo / legacy).
+
+    Object-Level Authorization:
+      - Si el usuario es Agente (y no Admin/Supervisor), solo ve sus propias evaluaciones.
     """
     query = (request.GET.get('q') or '').strip()
     evaluaciones = Evaluacion.objects.none()
@@ -433,6 +443,15 @@ def get_quick_range(quick: str):
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value, Roles.SUPERVISOR.value, Roles.AGENTE.value])
 def reportes_view(request):
+    """
+    Reportes con filtros de fechas, usuario y canal.
+
+    Function-Level Authorization:
+      - Admin, Supervisor o Agente.
+
+    Object-Level Authorization:
+      - Si es Agente (y no Admin/Supervisor) solo ve sus propias evaluaciones.
+    """
     quick = request.GET.get('quick')
     fecha_inicio = request.GET.get('fecha_inicio')
     fecha_fin = request.GET.get('fecha_fin')
@@ -553,6 +572,12 @@ MAX_EXPORT_ROWS = getattr(settings, 'MAX_EXPORT_ROWS', 50000)
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value, Roles.SUPERVISOR.value])
 def exportar_excel(request):
+    """
+    Exporta a Excel respetando:
+      - Function-Level Authorization: solo Admin/Supervisor.
+      - Unchecked_Input_for_Loop_Condition: se corta el queryset a MAX_EXPORT_ROWS
+        antes de iterar.
+    """
     if not (
         ValidarRolUsuario(request, Roles.ADMINISTRADOR.value)
         or ValidarRolUsuario(request, Roles.SUPERVISOR.value)
@@ -800,12 +825,17 @@ def exportar_excel(request):
     return resp
 
 
+@csrf_protect
 @require_http_methods(["GET", "POST"])
 def encuesta_publica(request, token):
     """
     Encuesta pública:
-    - Se eliminó @csrf_exempt para que quede protegida por el middleware CSRF.
+    - Protegida por CSRF (no se usa @csrf_exempt).
     - Asegúrate de tener {% csrf_token %} en el formulario HTML de la plantilla.
+
+    Function-Level Authorization:
+      - Se usa un token aleatorio de 24 caracteres como autorización.
+      - No requiere login para el ciudadano (es un enlace público controlado).
     """
     # Validación defensiva del token (tamano/charset) para evitar inputs extraños.
     if not isinstance(token, str) or len(token) != 24 or not token.isalnum():
@@ -821,7 +851,7 @@ def encuesta_publica(request, token):
     preguntas = list(PreguntaEncuesta.objects.all())
 
     if request.method == 'POST':
-        # CSRF ahora es verificado por el middleware (no hay @csrf_exempt)
+        # CSRF ahora es verificado por el middleware y el decorador @csrf_protect
         for p in preguntas:
             field = f"q_{p.id}"
             val = (request.POST.get(field) or '').strip()

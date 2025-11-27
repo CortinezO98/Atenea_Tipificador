@@ -35,6 +35,7 @@ def require_tipificador_access(view_func):
     return _wrapped_view
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def ciudadano(request):
@@ -70,6 +71,7 @@ def ciudadano(request):
         return JsonResponse({}, status=404)
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def tipos_canal(request):
@@ -78,6 +80,7 @@ def tipos_canal(request):
     return JsonResponse(list(tipos), safe=False)
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def segmentos(request):
@@ -97,6 +100,7 @@ def segmentos(request):
     return JsonResponse(list(segmentos), safe=False)
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def segmentos_ii(request):
@@ -109,6 +113,7 @@ def segmentos_ii(request):
     return JsonResponse(list(segmentos_ii), safe=False)
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def segmentos_iii(request):
@@ -147,6 +152,7 @@ def segmentos_iii(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def tipificaciones(request):
@@ -158,6 +164,7 @@ def tipificaciones(request):
     return JsonResponse(list(tipificaciones), safe=False)
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def tipificaciones_nuevas(request):
@@ -169,12 +176,14 @@ def tipificaciones_nuevas(request):
     return JsonResponse(list(tipificaciones), safe=False)
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def tipificaciones_todas(request):
     """
     Obtener TODAS las tipificaciones.
-    Para mayor seguridad, solo se permite a Administrador/Supervisor.
+    Solo se permite a Administrador/Supervisor (Function-Level Authorization).
+    No maneja objetos por usuario, solo catálogo global (Object-Level no aplica).
     """
     if not (
         ValidarRolUsuario(request, Roles.ADMINISTRADOR.value) or
@@ -186,10 +195,11 @@ def tipificaciones_todas(request):
     return JsonResponse(list(tipificaciones), safe=False)
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def categorias(request):
-    """Obtener categorías por tipificación"""
+    """Obtener categorías por tipificación (catálogo global)"""
     tipificacion_id = request.GET.get('tipificacion_id')
     if not tipificacion_id:
         return JsonResponse({'error': 'tipificacion_id requerido'}, status=400)
@@ -203,10 +213,11 @@ def categorias(request):
     return JsonResponse(list(categorias), safe=False)
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def subcategorias(request):
-    """Obtener subcategorías por categoría padre"""
+    """Obtener subcategorías por categoría padre (catálogo global)"""
     categoria_padre_id = request.GET.get('categoria_padre_id')
     if not categoria_padre_id:
         return JsonResponse({'error': 'categoria_padre_id requerido'}, status=400)
@@ -218,6 +229,7 @@ def subcategorias(request):
     return JsonResponse(list(subcategorias), safe=False)
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def subcategorias_ii(request):
@@ -240,6 +252,7 @@ def subcategorias_ii(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def subcategorias_iii(request):
@@ -262,10 +275,11 @@ def subcategorias_iii(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def tipificaciones_old(request):
-    """Para compatibilidad con código anterior"""
+    """Para compatibilidad con código anterior (catálogo)"""
     segmento_id = request.GET.get('segmento_id')
     if segmento_id:
         tipificaciones = Tipificacion.objects.filter(segmento_id=segmento_id).values('id', 'nombre')
@@ -273,10 +287,11 @@ def tipificaciones_old(request):
     return JsonResponse({'error': 'segmento_id requerido'}, status=400)
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def categorias_old(request):
-    """Para compatibilidad con código anterior"""
+    """Para compatibilidad con código anterior (catálogo)"""
     tipificacion_id = request.GET.get('tipificacion_id')
     if tipificacion_id:
         categorias = Categoria.objects.filter(tipificacion_id=tipificacion_id).values('id', 'nombre')
@@ -284,6 +299,7 @@ def categorias_old(request):
     return JsonResponse({'error': 'tipificacion_id requerido'}, status=400)
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def segmentos_iv(request):
@@ -294,6 +310,7 @@ def segmentos_iv(request):
     return JsonResponse(list(data), safe=False)
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def segmentos_v(request):
@@ -304,6 +321,7 @@ def segmentos_v(request):
     return JsonResponse(list(data), safe=False)
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def segmentos_vi(request):
@@ -314,6 +332,7 @@ def segmentos_vi(request):
     return JsonResponse(list(data), safe=False)
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def subcategorias_iv(request):
@@ -327,6 +346,7 @@ def subcategorias_iv(request):
     return JsonResponse(list(data), safe=False)
 
 
+@require_GET
 @login_required
 @require_tipificador_access
 def subcategorias_v(request):
@@ -348,6 +368,11 @@ def niveles(request):
     Devuelve categorías por nivel (1..6) y, si nivel>1, opcionalmente por padre.
     GET /api/niveles/?nivel=1
     GET /api/niveles/?nivel=2&padre_id=123
+
+    Function-Level Authorization:
+      - Requiere autenticación y rol (Administrador/Supervisor/Agente).
+    Object-Level Authorization:
+      - No aplica porque solo expone catálogos globales sin propiedad por usuario.
     """
     try:
         nivel = int(request.GET.get('nivel', '0'))

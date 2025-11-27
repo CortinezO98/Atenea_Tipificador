@@ -18,6 +18,7 @@ from .models import *
 from gestion.utils import RegistrarError
 from gestion.models import *
 import inspect
+from django.views.decorators.http import require_GET, require_POST
 
 
 def home_redirect_view(request):
@@ -77,6 +78,7 @@ def logout_view(request):
 
 @login_required
 @en_grupo([Roles.AGENTE.value])
+@require_GET
 def dashboard_agente(request):
     # --- Function / Object Level Authorization explícito ---
     if not _user_has_role(request.user, Roles.AGENTE.value):
@@ -105,6 +107,7 @@ def dashboard_agente(request):
 
 @login_required
 @en_grupo([Roles.SUPERVISOR.value])
+@require_GET
 def dashboard_supervisor(request):
     # --- Function Level Authorization explícito ---
     if not _user_has_role(request.user, Roles.SUPERVISOR.value):
@@ -143,6 +146,7 @@ def dashboard_supervisor(request):
 
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value])
+@require_GET
 def dashboard_admin(request):
     # --- Function Level Authorization explícito ---
     if not _user_has_role(request.user, Roles.ADMINISTRADOR.value):
@@ -273,6 +277,7 @@ def crear_usuario(request, user_id=None):
 
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value])
+@require_GET
 def ver_usuarios(request):
     # --- Function Level Authorization explícito ---
     if not _user_has_role(request.user, Roles.ADMINISTRADOR.value):
