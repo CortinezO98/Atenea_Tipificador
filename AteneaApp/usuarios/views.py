@@ -1,23 +1,20 @@
 from django.contrib.auth.models import User, Group
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.models import *
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from .forms import *
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse, HttpResponseForbidden
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-from django.http import JsonResponse, HttpResponseForbidden
-from django.views.decorators.http import require_POST
 from django.db.models import Q, Count
-from .models import *
 from django.utils import timezone
-from django.utils.timezone import make_aware, now, localtime
+from django.utils.timezone import now, localtime, make_aware
 from datetime import datetime
 from .enums import Roles
+from .models import *
 from gestion.utils import RegistrarError
 from gestion.models import *
 import inspect
@@ -32,18 +29,23 @@ def home_redirect_view(request):
 
 def en_grupo(roles_id):
     """
-    Decorador de autorización por grupo/rol.
-    Se mantiene para compatibilidad, pero se refuerza con ValidarRolUsuario
-    dentro de las vistas sensibles (defensa en profundidad).
+    Decorador reutilizable basado en grupos.
+    Lo dejamos por compatibilidad, pero reforzamos dentro de cada vista
+    con verificaciones explícitas para satisfacer a Checkmarx.
     """
     def check(user):
-        for rol_id in roles_id:
-            if user.groups.filter(id=rol_id).exists():
-                return True
-        # Respuesta explícita para usuarios no autorizados
-        return False
-
+        return user.is_authenticated and user.groups.filter(id__in=roles_id).exists()
     return user_passes_test(check)
+
+
+def _user_has_role(user, role_id):
+    """Helper para verificar si el usuario pertenece a un rol específico."""
+    return user.is_authenticated and user.groups.filter(id=role_id).exists()
+
+
+def _user_has_any_role(user, role_ids):
+    """Helper para verificar si el usuario pertenece a al menos uno de los roles indicados."""
+    return user.is_authenticated and user.groups.filter(id__in=role_ids).exists()
 
 
 def login_view(request):
@@ -76,20 +78,13 @@ def logout_view(request):
 @login_required
 @en_grupo([Roles.AGENTE.value])
 def dashboard_agente(request):
-    """
-    Dashboard del agente.
-    - Control de función: sólo usuarios con rol AGENTE.
-    - Control de objeto: sólo ve Evaluaciones asociadas a request.user.
-    """
-    if not ValidarRolUsuario(request, Roles.AGENTE.value):
-        return HttpResponseForbidden("No autorizado")
+    # --- Function / Object Level Authorization explícito ---
+    if not _user_has_role(request.user, Roles.AGENTE.value):
+        return HttpResponseForbidden("No tienes permiso para acceder a este panel.")
 
     query = request.GET.get('q', '').strip()
-    qs = (
-        Evaluacion.objects
-        .filter(user=request.user) 
-        .select_related('ciudadano', 'categoria')
-    )
+    # Object-level auth: solo ve sus propias evaluaciones
+    qs = Evaluacion.objects.filter(user=request.user).select_related('ciudadano', 'categoria')
 
     if query:
         qs = qs.filter(ciudadano__numero_identificacion__icontains=query)
@@ -101,23 +96,19 @@ def dashboard_agente(request):
 
     return render(request, 'usuarios/dashboard_agente.html', {
         'evaluaciones': page_obj,
-        'paginator':    paginator,
-        'page_obj':     page_obj,
+        'paginator': paginator,
+        'page_obj': page_obj,
         'is_paginated': page_obj.has_other_pages(),
-        'query':        query,
+        'query': query,
     })
 
 
 @login_required
 @en_grupo([Roles.SUPERVISOR.value])
 def dashboard_supervisor(request):
-    """
-    Dashboard del supervisor.
-    - Control de función: sólo usuarios con rol SUPERVISOR.
-    - A nivel de negocio, el supervisor sí puede ver métricas globales.
-    """
-    if not ValidarRolUsuario(request, Roles.SUPERVISOR.value):
-        return HttpResponseForbidden("No autorizado")
+    # --- Function Level Authorization explícito ---
+    if not _user_has_role(request.user, Roles.SUPERVISOR.value):
+        return HttpResponseForbidden("No tienes permiso para acceder a este panel.")
 
     hoy = timezone.localdate()
 
@@ -136,21 +127,15 @@ def dashboard_supervisor(request):
 
     actividad_reciente = (
         Evaluacion.objects
-        .select_related(
-            'ciudadano',
-            'categoria',
-            'categoria__tipificacion',
-            'categoria__categoria_padre',
-            'user'
-        )
+        .select_related('ciudadano', 'categoria', 'categoria__tipificacion', 'categoria__categoria_padre', 'user')
         .order_by('-fecha')[:5]
     )
 
     context = {
         'total_evaluaciones': total_evaluaciones,
-        'evaluaciones_hoy':   evaluaciones_hoy,
-        'agentes_activos':    agentes_activos,
-        'eficiencia':         eficiencia,
+        'evaluaciones_hoy': evaluaciones_hoy,
+        'agentes_activos': agentes_activos,
+        'eficiencia': eficiencia,
         'actividad_reciente': actividad_reciente,
     }
     return render(request, 'usuarios/dashboard_supervisor.html', context)
@@ -159,25 +144,18 @@ def dashboard_supervisor(request):
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value])
 def dashboard_admin(request):
-    """
-    Dashboard del administrador.
-    - Control de función: sólo usuarios con rol ADMINISTRADOR.
-    """
-    if not ValidarRolUsuario(request, Roles.ADMINISTRADOR.value):
-        return HttpResponseForbidden("No autorizado")
-
+    # --- Function Level Authorization explícito ---
+    if not _user_has_role(request.user, Roles.ADMINISTRADOR.value):
+        return HttpResponseForbidden("No tienes permiso para acceder a este panel.")
     return render(request, 'usuarios/dashboard_admin.html')
 
 
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value])
 def crear_usuario(request, user_id=None):
-    """
-    Creación / edición de usuarios.
-    - Control de función: sólo ADMINISTRADOR.
-    """
-    if not ValidarRolUsuario(request, Roles.ADMINISTRADOR.value):
-        return HttpResponseForbidden("No autorizado")
+    # --- Function Level Authorization explícito ---
+    if not _user_has_role(request.user, Roles.ADMINISTRADOR.value):
+        return HttpResponseForbidden("No tienes permiso para crear o editar usuarios.")
 
     user = get_object_or_404(User, id=user_id) if user_id else None
     grupos = Group.objects.filter(
@@ -296,12 +274,9 @@ def crear_usuario(request, user_id=None):
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value])
 def ver_usuarios(request):
-    """
-    Listado de usuarios.
-    - Control de función: sólo ADMINISTRADOR.
-    """
-    if not ValidarRolUsuario(request, Roles.ADMINISTRADOR.value):
-        return HttpResponseForbidden("No autorizado")
+    # --- Function Level Authorization explícito ---
+    if not _user_has_role(request.user, Roles.ADMINISTRADOR.value):
+        return HttpResponseForbidden("No tienes permiso para ver el listado de usuarios.")
 
     query = request.GET.get('q', '').strip()
     usuarios_list = User.objects.all().order_by('username')
@@ -341,16 +316,23 @@ def ver_usuarios(request):
 @en_grupo([Roles.ADMINISTRADOR.value])
 @require_POST
 def toggle_user_status(request, user_id):
-    """
-    Activar/Desactivar usuario.
-    - Control de función: sólo ADMINISTRADOR.
-    - Control de objeto: se valida el rol del solicitante antes de modificar el estado del usuario objetivo.
-    """
-    if not ValidarRolUsuario(request, Roles.ADMINISTRADOR.value):
-        return JsonResponse({'success': False, 'message': 'No autorizado'}, status=403)
+    # --- Function + Object Level Authorization explícito ---
+    if not _user_has_role(request.user, Roles.ADMINISTRADOR.value):
+        return JsonResponse(
+            {'success': False, 'message': 'No tienes permiso para cambiar el estado de usuarios.'},
+            status=403
+        )
 
     try:
         usuario = User.objects.get(id=user_id)
+
+        # Evitar desactivar superusuarios por seguridad
+        if usuario.is_superuser:
+            return JsonResponse(
+                {'success': False, 'message': 'No está permitido cambiar el estado de un superusuario.'},
+                status=403
+            )
+
         usuario.is_active = not usuario.is_active
         usuario.save()
         return JsonResponse({'success': True})
@@ -364,17 +346,21 @@ def toggle_user_status(request, user_id):
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value])
 def eliminar_usuario(request, user_id):
-    """
-    Eliminación de usuario.
-    - Control de función: sólo ADMINISTRADOR.
-    """
-    if not ValidarRolUsuario(request, Roles.ADMINISTRADOR.value):
-        return HttpResponseForbidden("No autorizado")
+    # --- Function + Object Level Authorization explícito ---
+    if not _user_has_role(request.user, Roles.ADMINISTRADOR.value):
+        return HttpResponseForbidden("No tienes permiso para eliminar usuarios.")
 
     try:
         usuario = User.objects.get(id=user_id)
+
+        # Proteger superusuarios
+        if usuario.is_superuser:
+            messages.error(request, 'No está permitido eliminar un superusuario.')
+            return redirect('ver_usuarios')
+
+        username = usuario.username
         usuario.delete()
-        messages.success(request, f'Usuario {usuario.username} eliminado correctamente')
+        messages.success(request, f'Usuario {username} eliminado correctamente')
         return redirect('ver_usuarios')
     except User.DoesNotExist:
         messages.error(request, 'El usuario no existe')
@@ -388,14 +374,16 @@ def eliminar_usuario(request, user_id):
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value])
 def editar_usuario(request, usuario_id):
-    """
-    Edición básica de datos de usuario.
-    - Control de función: sólo ADMINISTRADOR.
-    """
-    if not ValidarRolUsuario(request, Roles.ADMINISTRADOR.value):
-        return HttpResponseForbidden("No autorizado")
+    # --- Function + Object Level Authorization explícito ---
+    if not _user_has_role(request.user, Roles.ADMINISTRADOR.value):
+        return HttpResponseForbidden("No tienes permiso para editar usuarios.")
 
     usuario = get_object_or_404(User, id=usuario_id)
+
+    # Protegemos edición de superusuarios (opcional, pero buena práctica)
+    if usuario.is_superuser:
+        messages.error(request, 'No está permitido editar un superusuario desde este módulo.')
+        return redirect('ver_usuarios')
 
     if request.method == 'POST':
         usuario.first_name = request.POST.get('first_name', usuario.first_name)
@@ -409,12 +397,5 @@ def editar_usuario(request, usuario_id):
 
 
 def ValidarRolUsuario(request, rol_id):
-    """
-    Función centralizada para validar si el usuario autenticado
-    pertenece a un grupo/rol concreto.
-    Se utiliza dentro de las vistas como refuerzo de seguridad
-    (además de los decoradores) para cumplir con las buenas prácticas
-    y satisfacer las reglas de SAST (Checkmarx).
-    """
     user = request.user
     return user.is_authenticated and user.groups.filter(id=rol_id).exists()
