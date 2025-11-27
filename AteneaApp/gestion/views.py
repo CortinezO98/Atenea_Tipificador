@@ -1,13 +1,15 @@
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect
-from django.http import HttpResponse
+from django.contrib.auth.models import User
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.contrib import messages
 from django.db import transaction
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.views.decorators.http import require_GET
 from django.utils.timezone import now, make_aware, localtime
+from django.utils import timezone
 from django.utils.crypto import get_random_string
 from django.urls import reverse
 from usuarios.views import ValidarRolUsuario, en_grupo
@@ -20,11 +22,10 @@ from datetime import datetime, timedelta
 import openpyxl
 from openpyxl.utils import get_column_letter
 import inspect
-from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
-from django.utils.html import format_html 
-import inspect
+from django.utils.html import format_html
 from .forms import build_encuesta_form
+
 
 def index(request):
     if request.user.is_authenticated:
@@ -38,7 +39,6 @@ def index(request):
         return redirect('logout')
     else:
         return redirect('login')
-
 
 
 def _clean_str(value, max_len=None):
@@ -88,6 +88,12 @@ def crear_evaluacion(request):
       - Guarda tipo_canal_id
       - Crea encuesta asociada
     """
+    is_admin = ValidarRolUsuario(request, Roles.ADMINISTRADOR.value)
+    is_supervisor = ValidarRolUsuario(request, Roles.SUPERVISOR.value)
+    is_agent = ValidarRolUsuario(request, Roles.AGENTE.value)
+    if not (is_admin or is_supervisor or is_agent):
+        return HttpResponseForbidden("No autorizado")
+
     if request.method == 'POST':
         try:
             with transaction.atomic():
@@ -133,7 +139,8 @@ def crear_evaluacion(request):
                     )
 
                     if cid:
-                        ciudadano = Ciudadano.objects.get(id=cid)
+                        # Uso de get_object_or_404 para evitar accesos inválidos
+                        ciudadano = get_object_or_404(Ciudadano, id=cid)
 
                         ciudadano.tipo_identificacion_id = tipo_identificacion_id
                         ciudadano.numero_identificacion = numero_identificacion
@@ -369,6 +376,13 @@ def buscar_tipificacion(request):
             .order_by('-fecha')
         )
 
+        is_admin = ValidarRolUsuario(request, Roles.ADMINISTRADOR.value)
+        is_supervisor = ValidarRolUsuario(request, Roles.SUPERVISOR.value)
+        is_agent = ValidarRolUsuario(request, Roles.AGENTE.value)
+
+        if is_agent and not (is_admin or is_supervisor):
+            qs = qs.filter(user=request.user)
+
         paginator = Paginator(qs, 10)
         page_number = request.GET.get('page') or 1
         evaluaciones = paginator.get_page(page_number)
@@ -413,6 +427,12 @@ def reportes_view(request):
     usuario_id = request.GET.get('usuario')
     canal_id = request.GET.get('canal')
 
+    is_admin = ValidarRolUsuario(request, Roles.ADMINISTRADOR.value)
+    is_supervisor = ValidarRolUsuario(request, Roles.SUPERVISOR.value)
+    is_agent = ValidarRolUsuario(request, Roles.AGENTE.value)
+    if not (is_admin or is_supervisor or is_agent):
+        return HttpResponseForbidden("No autorizado")
+
     qs = (
         Evaluacion.objects
         .select_related(
@@ -432,6 +452,9 @@ def reportes_view(request):
         )
         .order_by('-fecha')
     )
+
+    if is_agent and not (is_admin or is_supervisor):
+        qs = qs.filter(user=request.user)
 
     if quick in ('hoy', 'ayer', '7d'):
         start, end, _ = get_quick_range(quick)
@@ -457,10 +480,20 @@ def reportes_view(request):
     if canal_id and str(canal_id).isdigit():
         qs = qs.filter(tipo_canal_id=int(canal_id))
 
-    usuarios = User.objects.filter(groups__name__in=['Agente', 'Supervisor', 'Administrador']).distinct()
+    # Usuarios visibles en filtros
+    if is_agent and not (is_admin or is_supervisor):
+        usuarios = User.objects.filter(id=request.user.id).distinct()
+    else:
+        usuarios = User.objects.filter(
+            groups__name__in=['Agente', 'Supervisor', 'Administrador']
+        ).distinct()
+
     canales = TipoCanal.objects.all()
 
     base = Evaluacion.objects.all()
+    if is_agent and not (is_admin or is_supervisor):
+        base = base.filter(user=request.user)
+
     if usuario_id and str(usuario_id).isdigit():
         base = base.filter(user_id=int(usuario_id))
     if canal_id and str(canal_id).isdigit():
@@ -498,16 +531,26 @@ def xl_safe(v):
     return ILLEGAL_CHARACTERS_RE.sub('', str(v))
 
 
+# Límite de filas para exportación para evitar DoS por bucle excesivo
+MAX_EXPORT_ROWS = getattr(settings, 'MAX_EXPORT_ROWS', 50000)
+
+
 @require_GET
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value, Roles.SUPERVISOR.value])
 def exportar_excel(request):
+    if not (
+        ValidarRolUsuario(request, Roles.ADMINISTRADOR.value)
+        or ValidarRolUsuario(request, Roles.SUPERVISOR.value)
+    ):
+        return HttpResponseForbidden("No autorizado")
+
     quick        = request.GET.get('quick')
     hoy_flag     = request.GET.get('hoy') == '1'
     fecha_inicio = request.GET.get('fecha_inicio')
     fecha_fin    = request.GET.get('fecha_fin')
     usuario      = request.GET.get('usuario')
-    canal        = request.GET.get('canal')  # opcional (compatibilidad)
+    canal        = request.GET.get('canal')  
 
     qs = (
         Evaluacion.objects
@@ -561,13 +604,12 @@ def exportar_excel(request):
             start, end, _ = get_quick_range('hoy')
             qs = qs.filter(fecha__range=(start, end))
 
-    # Filtros adicionales
     if usuario and str(usuario).isdigit():
         qs = qs.filter(user_id=int(usuario))
     if canal and str(canal).isdigit():
         qs = qs.filter(tipo_canal_id=int(canal))
 
-    # ---- Excel (1 sola hoja) ----
+    qs = qs[:MAX_EXPORT_ROWS]
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Reportes"
@@ -603,7 +645,6 @@ def exportar_excel(request):
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
 
-    # Imports locales
     from .models import Encuesta, RespuestaEncuesta
 
     for row_idx, ev in enumerate(qs.iterator(), start=2):
@@ -615,7 +656,6 @@ def exportar_excel(request):
         telf_contacto   = ev.contacto_telefono or ''
         telf_inconser   = ev.contacto_telefono_inconcer or ''
 
-        # --- Reconstruir N1..N6 desde ev.categoria ---
         n1 = n2 = n3 = n4 = n5 = n6 = ''
         nivel_final = 'Sin categoría'
         if ev.categoria:
@@ -635,7 +675,6 @@ def exportar_excel(request):
                     nivel_final = f"Nivel {k}"
                     break
 
-        # --- Encuesta de satisfacción (misma fila) ---
         encuesta = (
             Encuesta.objects
             .filter(evaluacion=ev)
@@ -697,7 +736,6 @@ def exportar_excel(request):
             enc_respuestas_txt = " | ".join(txt_pairs) if txt_pairs else ''
 
         data = [
-            # Fecha y ciudadano básico
             localtime(ev.fecha).strftime('%Y-%m-%d %H:%M'),
             ciu.tipo_identificacion.nombre,
             ciu.numero_identificacion,
@@ -708,7 +746,6 @@ def exportar_excel(request):
             ciu.ciudad or '',
             ciu.direccion_residencia or '',
 
-            # === CARACTERIZACIÓN (pegada al ciudadano) ===
             getattr(ciu.sexo, 'nombre', ''),
             getattr(ciu.genero, 'nombre', ''),
             getattr(ciu.orientacion, 'nombre', ''),
@@ -735,7 +772,6 @@ def exportar_excel(request):
         for col, value in enumerate(data, 1):
             ws.cell(row=row_idx, column=col, value=xl_safe(value))
 
-    # Autosize básico
     col_widths = [len(h) + 2 for h in headers]
     for r in ws.iter_rows(min_row=2, max_row=ws.max_row, max_col=len(headers)):
         for i, cell in enumerate(r):
@@ -762,8 +798,12 @@ def exportar_excel(request):
     resp['Content-Disposition'] = 'attachment; filename="reportes_niveles_encuesta.xlsx"'
     return resp
 
-@csrf_exempt   
+
+@csrf_exempt
 def encuesta_publica(request, token):
+    if not isinstance(token, str) or len(token) != 24 or not token.isalnum():
+        return HttpResponseBadRequest("Token inválido")
+
     encuesta = get_object_or_404(Encuesta, token=token)
     if encuesta.cerrada:
         if encuesta.expirada:
@@ -795,7 +835,7 @@ def encuesta_publica(request, token):
             RespuestaEncuesta.objects.update_or_create(
                 encuesta=encuesta, pregunta=p, defaults={'valor': val}
             )
-        
+
         encuesta.respondida_en = timezone.now()
         encuesta.save()
 
