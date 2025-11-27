@@ -71,7 +71,12 @@
                 {% if user %}Nueva Contraseña{% else %}Contraseña*{% endif %}
               </label>
               <div class="input-group has-validation">
-                <input type="password" name="password" class="form-control {% if form.password.errors %}is-invalid{% endif %}" id="id_password" {% if not user %}required{% endif %}>
+                <input type="password"
+                      name="password"
+                      class="form-control {% if form.password.errors %}is-invalid{% endif %}"
+                      id="id_password"
+                      {% if not user %}required{% endif %}
+                      autocomplete="new-password">
                 <button class="btn btn-outline-secondary toggle-password" type="button" data-target="id_password">
                   <i class="bi bi-eye"></i>
                 </button>
@@ -93,7 +98,12 @@
                 {% if user %}Confirmar Nueva Contraseña{% else %}Confirmar Contraseña*{% endif %}
               </label>
               <div class="input-group has-validation">
-                <input type="password" name="confirm_password" class="form-control {% if form.confirm_password.errors %}is-invalid{% endif %}" id="id_confirm_password" {% if not user %}required{% endif %}>
+                <input type="password"
+                      name="confirm_password"
+                      class="form-control {% if form.confirm_password.errors %}is-invalid{% endif %}"
+                      id="id_confirm_password"
+                      {% if not user %}required{% endif %}
+                      autocomplete="new-password">
                 <button class="btn btn-outline-secondary toggle-password" type="button" data-target="id_confirm_password">
                   <i class="bi bi-eye"></i>
                 </button>

@@ -6,40 +6,43 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from .forms import *
 from django.http import HttpResponse
-from django.core.paginator import  Paginator, EmptyPage, PageNotAnInteger
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.decorators import user_passes_test
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.http import require_POST
-from django.db.models import Q
+from django.db.models import Q, Count
 from .models import *
 from django.utils import timezone
-from django.http import HttpResponseForbidden
-from django.utils.timezone import make_aware
-from django.utils.timezone import now, localtime
-from django.db.models import Count
+from django.utils.timezone import make_aware, now, localtime
 from datetime import datetime
-from django.shortcuts import redirect
 from .enums import Roles
 from gestion.utils import RegistrarError
 from gestion.models import *
 import inspect
 
+
 def home_redirect_view(request):
     if request.user.is_authenticated:
-        return redirect('home')  
+        return redirect('home')
     else:
         return render(request, 'usuarios/auth/login.html')
 
 
 def en_grupo(roles_id):
+    """
+    Decorador de autorización por grupo/rol.
+    Se mantiene para compatibilidad, pero se refuerza con ValidarRolUsuario
+    dentro de las vistas sensibles (defensa en profundidad).
+    """
     def check(user):
         for rol_id in roles_id:
             if user.groups.filter(id=rol_id).exists():
                 return True
+        # Respuesta explícita para usuarios no autorizados
+        return False
+
     return user_passes_test(check)
 
 
@@ -73,8 +76,20 @@ def logout_view(request):
 @login_required
 @en_grupo([Roles.AGENTE.value])
 def dashboard_agente(request):
+    """
+    Dashboard del agente.
+    - Control de función: sólo usuarios con rol AGENTE.
+    - Control de objeto: sólo ve Evaluaciones asociadas a request.user.
+    """
+    if not ValidarRolUsuario(request, Roles.AGENTE.value):
+        return HttpResponseForbidden("No autorizado")
+
     query = request.GET.get('q', '').strip()
-    qs = Evaluacion.objects.filter(user=request.user).select_related('ciudadano', 'categoria')
+    qs = (
+        Evaluacion.objects
+        .filter(user=request.user) 
+        .select_related('ciudadano', 'categoria')
+    )
 
     if query:
         qs = qs.filter(ciudadano__numero_identificacion__icontains=query)
@@ -96,16 +111,23 @@ def dashboard_agente(request):
 @login_required
 @en_grupo([Roles.SUPERVISOR.value])
 def dashboard_supervisor(request):
+    """
+    Dashboard del supervisor.
+    - Control de función: sólo usuarios con rol SUPERVISOR.
+    - A nivel de negocio, el supervisor sí puede ver métricas globales.
+    """
+    if not ValidarRolUsuario(request, Roles.SUPERVISOR.value):
+        return HttpResponseForbidden("No autorizado")
+
     hoy = timezone.localdate()
 
     total_evaluaciones = Evaluacion.objects.count()
-    evaluaciones_hoy   = Evaluacion.objects.filter(fecha__date=hoy).count()
+    evaluaciones_hoy = Evaluacion.objects.filter(fecha__date=hoy).count()
 
     agentes_activos = User.objects.filter(
         is_active=True,
         groups__name=Roles.AGENTE.label
     ).count()
-
 
     if agentes_activos > 0:
         eficiencia = round((evaluaciones_hoy / agentes_activos) * 100, 1)
@@ -114,7 +136,13 @@ def dashboard_supervisor(request):
 
     actividad_reciente = (
         Evaluacion.objects
-        .select_related('ciudadano', 'categoria', 'categoria__tipificacion', 'categoria__categoria_padre', 'user')
+        .select_related(
+            'ciudadano',
+            'categoria',
+            'categoria__tipificacion',
+            'categoria__categoria_padre',
+            'user'
+        )
         .order_by('-fecha')[:5]
     )
 
@@ -131,14 +159,35 @@ def dashboard_supervisor(request):
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value])
 def dashboard_admin(request):
+    """
+    Dashboard del administrador.
+    - Control de función: sólo usuarios con rol ADMINISTRADOR.
+    """
+    if not ValidarRolUsuario(request, Roles.ADMINISTRADOR.value):
+        return HttpResponseForbidden("No autorizado")
+
     return render(request, 'usuarios/dashboard_admin.html')
 
 
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value])
 def crear_usuario(request, user_id=None):
+    """
+    Creación / edición de usuarios.
+    - Control de función: sólo ADMINISTRADOR.
+    """
+    if not ValidarRolUsuario(request, Roles.ADMINISTRADOR.value):
+        return HttpResponseForbidden("No autorizado")
+
     user = get_object_or_404(User, id=user_id) if user_id else None
-    grupos = Group.objects.filter(id__in=[Roles.ADMINISTRADOR.value,Roles.SUPERVISOR.value,Roles.AGENTE.value,Roles.ABOGADO.value,])
+    grupos = Group.objects.filter(
+        id__in=[
+            Roles.ADMINISTRADOR.value,
+            Roles.SUPERVISOR.value,
+            Roles.AGENTE.value,
+            Roles.ABOGADO.value,
+        ]
+    )
     grupo_asignado = user.groups.first() if user else None
 
     if request.method == "POST":
@@ -152,7 +201,7 @@ def crear_usuario(request, user_id=None):
         is_active = request.POST.get("is_active") == "on"
 
         errors = []
-        
+
         required_fields = {
             'username': username,
             'email': email,
@@ -160,8 +209,8 @@ def crear_usuario(request, user_id=None):
             'last_name': last_name,
             'rol': rol_id
         }
-        
-        if not user: 
+
+        if not user:
             required_fields['password'] = password
             required_fields['confirm_password'] = confirm_password
 
@@ -177,7 +226,7 @@ def crear_usuario(request, user_id=None):
 
         if User.objects.filter(username=username).exclude(pk=user.pk if user else None).exists():
             errors.append("El nombre de usuario ya está en uso.")
-            
+
         if User.objects.filter(email=email).exclude(pk=user.pk if user else None).exists():
             errors.append("El correo electrónico ya está en uso.")
 
@@ -195,7 +244,7 @@ def crear_usuario(request, user_id=None):
 
         try:
             grupo = Group.objects.get(id=rol_id)
-            
+
             if not user:
                 user = User.objects.create_user(
                     username=username,
@@ -224,8 +273,6 @@ def crear_usuario(request, user_id=None):
                     email=user.email,
                     defaults={'nombre': nombre_completo}
                 )
-            
-            grupo_nombre = grupo.name.lower()
 
             messages.success(request, f"Usuario {'actualizado' if user_id else 'creado'} correctamente.")
             return redirect('dashboard_admin')
@@ -249,6 +296,13 @@ def crear_usuario(request, user_id=None):
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value])
 def ver_usuarios(request):
+    """
+    Listado de usuarios.
+    - Control de función: sólo ADMINISTRADOR.
+    """
+    if not ValidarRolUsuario(request, Roles.ADMINISTRADOR.value):
+        return HttpResponseForbidden("No autorizado")
+
     query = request.GET.get('q', '').strip()
     usuarios_list = User.objects.all().order_by('username')
 
@@ -263,7 +317,7 @@ def ver_usuarios(request):
         usuarios_list = usuarios_list.filter(q_objects).distinct()
 
     page = request.GET.get('page', 1)
-    paginator = Paginator(usuarios_list, 10)  
+    paginator = Paginator(usuarios_list, 10)
 
     try:
         usuarios = paginator.page(page)
@@ -287,6 +341,14 @@ def ver_usuarios(request):
 @en_grupo([Roles.ADMINISTRADOR.value])
 @require_POST
 def toggle_user_status(request, user_id):
+    """
+    Activar/Desactivar usuario.
+    - Control de función: sólo ADMINISTRADOR.
+    - Control de objeto: se valida el rol del solicitante antes de modificar el estado del usuario objetivo.
+    """
+    if not ValidarRolUsuario(request, Roles.ADMINISTRADOR.value):
+        return JsonResponse({'success': False, 'message': 'No autorizado'}, status=403)
+
     try:
         usuario = User.objects.get(id=user_id)
         usuario.is_active = not usuario.is_active
@@ -302,6 +364,13 @@ def toggle_user_status(request, user_id):
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value])
 def eliminar_usuario(request, user_id):
+    """
+    Eliminación de usuario.
+    - Control de función: sólo ADMINISTRADOR.
+    """
+    if not ValidarRolUsuario(request, Roles.ADMINISTRADOR.value):
+        return HttpResponseForbidden("No autorizado")
+
     try:
         usuario = User.objects.get(id=user_id)
         usuario.delete()
@@ -319,6 +388,13 @@ def eliminar_usuario(request, user_id):
 @login_required
 @en_grupo([Roles.ADMINISTRADOR.value])
 def editar_usuario(request, usuario_id):
+    """
+    Edición básica de datos de usuario.
+    - Control de función: sólo ADMINISTRADOR.
+    """
+    if not ValidarRolUsuario(request, Roles.ADMINISTRADOR.value):
+        return HttpResponseForbidden("No autorizado")
+
     usuario = get_object_or_404(User, id=usuario_id)
 
     if request.method == 'POST':
@@ -333,9 +409,12 @@ def editar_usuario(request, usuario_id):
 
 
 def ValidarRolUsuario(request, rol_id):
+    """
+    Función centralizada para validar si el usuario autenticado
+    pertenece a un grupo/rol concreto.
+    Se utiliza dentro de las vistas como refuerzo de seguridad
+    (además de los decoradores) para cumplir con las buenas prácticas
+    y satisfacer las reglas de SAST (Checkmarx).
+    """
     user = request.user
-    return user.groups.filter(id=rol_id).exists()
-
-
-
-
+    return user.is_authenticated and user.groups.filter(id=rol_id).exists()

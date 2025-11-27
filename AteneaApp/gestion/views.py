@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.db import transaction
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_http_methods
 from django.utils.timezone import now, make_aware, localtime
 from django.utils import timezone
 from django.utils.crypto import get_random_string
@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 import openpyxl
 from openpyxl.utils import get_column_letter
 import inspect
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_exempt  # puedes dejarlo si lo usas en otros lados
 from django.utils.html import format_html
 from .forms import build_encuesta_form
 
@@ -106,8 +106,9 @@ def crear_evaluacion(request):
                 if es_anonimo:
                     ciudadano = get_ciudadano_anonimo()
                 else:
-                    cid = request.POST.get('cuidadano_id')
-
+                    # IMPORTANTE: validación adicional para evitar que un usuario
+                    # manipule el id de ciudadano y actualice datos de otro.
+                    cid_raw = request.POST.get('cuidadano_id')
                     tipo_identificacion_id = request.POST['tipo_identificacion']
                     numero_identificacion = _clean_str(
                         request.POST['numero_identificacion'], 20
@@ -138,10 +139,18 @@ def crear_evaluacion(request):
                         request.POST.get('calidad_comunicacion') or None
                     )
 
-                    if cid:
-                        # Uso de get_object_or_404 para evitar accesos inválidos
-                        ciudadano = get_object_or_404(Ciudadano, id=cid)
+                    ciudadano = None
+                    if cid_raw and str(cid_raw).isdigit():
+                        # Object-Level Authorization defensivo:
+                        # se asegura que el id coincida con el documento y tipo
+                        ciudadano = get_object_or_404(
+                            Ciudadano,
+                            id=int(cid_raw),
+                            numero_identificacion=numero_identificacion,
+                            tipo_identificacion_id=tipo_identificacion_id,
+                        )
 
+                    if ciudadano:
                         ciudadano.tipo_identificacion_id = tipo_identificacion_id
                         ciudadano.numero_identificacion = numero_identificacion
                         ciudadano.nombre = nombre
@@ -164,9 +173,9 @@ def crear_evaluacion(request):
                         ciudadano.calidad_comunicacion_id = (
                             calidad_comunicacion_id
                         )
-
                         ciudadano.save()
                     else:
+                        # Si el id no es válido o no coincide, se crea un nuevo registro.
                         ciudadano = Ciudadano.objects.create(
                             tipo_identificacion_id=tipo_identificacion_id,
                             numero_identificacion=numero_identificacion,
@@ -341,7 +350,7 @@ def buscar_tipificacion(request):
     """
     Busca Evaluacion(es) por número de identificación del ciudadano,
     correo/teléfono de contacto guardados en la Evaluación (anónimo),
-    y correo/teléfono del Ciudadano (no anónimo / legacy).
+    y correo/telefoneo del Ciudadano (no anónimo / legacy).
     """
     query = (request.GET.get('q') or '').strip()
     evaluaciones = Evaluacion.objects.none()
@@ -380,11 +389,14 @@ def buscar_tipificacion(request):
         is_supervisor = ValidarRolUsuario(request, Roles.SUPERVISOR.value)
         is_agent = ValidarRolUsuario(request, Roles.AGENTE.value)
 
+        # Object-Level Authorization: el agente solo ve sus propias evaluaciones
         if is_agent and not (is_admin or is_supervisor):
             qs = qs.filter(user=request.user)
 
         paginator = Paginator(qs, 10)
-        page_number = request.GET.get('page') or 1
+        page_number = request.GET.get('page')
+        if not page_number or not str(page_number).isdigit():
+            page_number = 1
         evaluaciones = paginator.get_page(page_number)
 
     return render(request, 'usuarios/evaluaciones/buscar_tipificacion.html', {
@@ -453,6 +465,7 @@ def reportes_view(request):
         .order_by('-fecha')
     )
 
+    # El agente solo ve sus propias evaluaciones (Object-Level Authorization)
     if is_agent and not (is_admin or is_supervisor):
         qs = qs.filter(user=request.user)
 
@@ -490,6 +503,7 @@ def reportes_view(request):
 
     canales = TipoCanal.objects.all()
 
+    # Base para totales (respetando las mismas restricciones de acceso)
     base = Evaluacion.objects.all()
     if is_agent and not (is_admin or is_supervisor):
         base = base.filter(user=request.user)
@@ -550,15 +564,13 @@ def exportar_excel(request):
     fecha_inicio = request.GET.get('fecha_inicio')
     fecha_fin    = request.GET.get('fecha_fin')
     usuario      = request.GET.get('usuario')
-    canal        = request.GET.get('canal')  
+    canal        = request.GET.get('canal')
 
     qs = (
         Evaluacion.objects
         .select_related(
             'ciudadano__tipo_identificacion',
             'ciudadano__pais',
-
-            # ===== NUEVO: evitar N+1 en caracterización =====
             'ciudadano__sexo',
             'ciudadano__genero',
             'ciudadano__orientacion',
@@ -571,12 +583,10 @@ def exportar_excel(request):
             'ciudadano__estrato',
             'ciudadano__localidad',
             'ciudadano__calidad_comunicacion',
-
-            # Relaciones ya existentes
             'categoria__tipificacion',
             'categoria__categoria_padre',
             'user',
-            'tipo_canal',  # para nombre del canal
+            'tipo_canal',
             'segmento', 'segmento_ii', 'segmento_iii',
             'segmento_iv', 'segmento_v', 'segmento_vi', 'tipificacion',
         )
@@ -600,6 +610,7 @@ def exportar_excel(request):
         except ValueError:
             pass
     else:
+        # Si no hay filtros específicos de usuario/canal, se limita por defecto a 'hoy'
         if not (usuario and str(usuario).isdigit()) and not (canal and str(canal).isdigit()):
             start, end, _ = get_quick_range('hoy')
             qs = qs.filter(fecha__range=(start, end))
@@ -609,7 +620,10 @@ def exportar_excel(request):
     if canal and str(canal).isdigit():
         qs = qs.filter(tipo_canal_id=int(canal))
 
+    # MITIGACIÓN Unchecked_Input_for_Loop_Condition:
+    # Limitar máximo de filas exportadas para evitar loops enormes controlados por parámetros.
     qs = qs[:MAX_EXPORT_ROWS]
+
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Reportes"
@@ -618,26 +632,14 @@ def exportar_excel(request):
         'Fecha', 'Tipo Documento', 'Número ID', 'Nombre',
         'Correo', 'Teléfono',
         'País', 'Ciudad', 'Dirección',
-
-        # === BLOQUE CIUDADANO: CARACTERIZACIÓN (ahora junto al ciudadano) ===
         'Sexo','Género','Orientación Sexual','Tiene Discapacidad','Discapacidad',
         'Rango de Edad','Nivel Educativo','Grupo Étnico','Grupo Poblacional',
         'Estrato','Localidad','Calidad Comunicación',
-
-        # Contactos de anónimo / externos
         'Correo contacto', 'Teléfono contacto', 'Teléfono Inconcer',
-
-        # Conversación
         'ID Conversación',
-
-        # SOLO NIVELES
         'Nivel 1', 'Nivel 2', 'Nivel 3', 'Nivel 4', 'Nivel 5', 'Nivel 6', 'Nivel Final',
-
-        # ENCUESTA
         'Encuesta estado', 'Encuesta respondida en', 'Encuesta token', 'Encuesta URL',
         'Encuesta promedio (escala 1-5)', 'Encuesta respuestas (texto)',
-
-        # Otros
         'Tipo de Canal',
         'Observación',
         'Usuario'
@@ -745,7 +747,6 @@ def exportar_excel(request):
             ciu.pais.nombre if ciu.pais else '',
             ciu.ciudad or '',
             ciu.direccion_residencia or '',
-
             getattr(ciu.sexo, 'nombre', ''),
             getattr(ciu.genero, 'nombre', ''),
             getattr(ciu.orientacion, 'nombre', ''),
@@ -799,8 +800,14 @@ def exportar_excel(request):
     return resp
 
 
-@csrf_exempt
+@require_http_methods(["GET", "POST"])
 def encuesta_publica(request, token):
+    """
+    Encuesta pública:
+    - Se eliminó @csrf_exempt para que quede protegida por el middleware CSRF.
+    - Asegúrate de tener {% csrf_token %} en el formulario HTML de la plantilla.
+    """
+    # Validación defensiva del token (tamano/charset) para evitar inputs extraños.
     if not isinstance(token, str) or len(token) != 24 or not token.isalnum():
         return HttpResponseBadRequest("Token inválido")
 
@@ -814,6 +821,7 @@ def encuesta_publica(request, token):
     preguntas = list(PreguntaEncuesta.objects.all())
 
     if request.method == 'POST':
+        # CSRF ahora es verificado por el middleware (no hay @csrf_exempt)
         for p in preguntas:
             field = f"q_{p.id}"
             val = (request.POST.get(field) or '').strip()

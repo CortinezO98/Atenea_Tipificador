@@ -4,16 +4,17 @@ from django.views.decorators.http import require_GET
 from functools import wraps
 
 from .models import *
+from usuarios.enums import Roles
+from usuarios.views import ValidarRolUsuario
 
-
-# 
 
 def require_tipificador_access(view_func):
     """
     Decorador de autorización para los endpoints del tipificador.
 
     - Requiere que el usuario esté autenticado.
-    - Aquí podrías agregar validaciones de grupo/rol si lo necesitas más adelante.
+    - Valida que pertenezca a uno de los roles permitidos:
+      Administrador, Supervisor o Agente.
     """
     @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):
@@ -21,10 +22,17 @@ def require_tipificador_access(view_func):
         if user is None or not user.is_authenticated:
             return HttpResponseForbidden("No autorizado para acceder al tipificador.")
 
+        # Function-Level Authorization explícito
+        if not (
+            ValidarRolUsuario(request, Roles.ADMINISTRADOR.value) or
+            ValidarRolUsuario(request, Roles.SUPERVISOR.value) or
+            ValidarRolUsuario(request, Roles.AGENTE.value)
+        ):
+            return HttpResponseForbidden("No autorizado para acceder al tipificador.")
+
         return view_func(request, *args, **kwargs)
 
     return _wrapped_view
-
 
 
 @login_required
@@ -78,7 +86,7 @@ def segmentos(request):
     if not tipo_canal_id:
         return JsonResponse({'error': 'tipo_canal_id requerido'}, status=400)
 
-    segmentos_inactivos = [19, 20, 23, 24, 27, 28]  
+    segmentos_inactivos = [19, 20, 23, 24, 27, 28]
 
     segmentos = Segmento.objects.filter(
         tipo_canal_id=tipo_canal_id
@@ -139,14 +147,13 @@ def segmentos_iii(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-
 @login_required
 @require_tipificador_access
 def tipificaciones(request):
-    """Obtener solo las tipificaciones de la nueva estructura (153-162)"""
+    """Obtener solo las tipificaciones de la nueva estructura (153-165)"""
     tipificaciones = Tipificacion.objects.filter(
-        id__gte=153,  # Mayor o igual a 153
-        id__lte=165   # Menor o igual a 165
+        id__gte=153,
+        id__lte=165
     ).values('id', 'nombre').order_by('id')
     return JsonResponse(list(tipificaciones), safe=False)
 
@@ -154,7 +161,7 @@ def tipificaciones(request):
 @login_required
 @require_tipificador_access
 def tipificaciones_nuevas(request):
-    """API específica para las tipificaciones nuevas (153-162)"""
+    """API específica para las tipificaciones nuevas (153-165)"""
     tipificaciones_ids = [153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165]
     tipificaciones = Tipificacion.objects.filter(
         id__in=tipificaciones_ids
@@ -165,11 +172,18 @@ def tipificaciones_nuevas(request):
 @login_required
 @require_tipificador_access
 def tipificaciones_todas(request):
-    """Obtener TODAS las tipificaciones (para uso administrativo si es necesario)"""
+    """
+    Obtener TODAS las tipificaciones.
+    Para mayor seguridad, solo se permite a Administrador/Supervisor.
+    """
+    if not (
+        ValidarRolUsuario(request, Roles.ADMINISTRADOR.value) or
+        ValidarRolUsuario(request, Roles.SUPERVISOR.value)
+    ):
+        return HttpResponseForbidden("No autorizado para ver todas las tipificaciones.")
+
     tipificaciones = Tipificacion.objects.all().values('id', 'nombre').order_by('id')
     return JsonResponse(list(tipificaciones), safe=False)
-
-
 
 
 @login_required
@@ -182,7 +196,7 @@ def categorias(request):
 
     categorias = Categoria.objects.filter(
         tipificacion_id=tipificacion_id,
-        nivel=1  
+        nivel=1
     ).exclude(
         id=1018
     ).values('id', 'nombre')
@@ -199,10 +213,9 @@ def subcategorias(request):
 
     subcategorias = Categoria.objects.filter(
         categoria_padre_id=categoria_padre_id,
-        nivel=2  # Solo subcategorías de nivel 2
+        nivel=2
     ).values('id', 'nombre')
     return JsonResponse(list(subcategorias), safe=False)
-
 
 
 @login_required
@@ -210,7 +223,6 @@ def subcategorias(request):
 def subcategorias_ii(request):
     """
     Obtener Sub Categorías II (nivel 3) por categoría padre
-    Específicamente para PSICOLOGIA
     """
     categoria_padre_id = request.GET.get('categoria_padre_id')
     if not categoria_padre_id:
@@ -219,7 +231,7 @@ def subcategorias_ii(request):
     try:
         subcategorias_ii = Categoria.objects.filter(
             categoria_padre_id=categoria_padre_id,
-            nivel=3  # Sub Categorías II son nivel 3
+            nivel=3
         ).values('id', 'nombre').order_by('nombre')
 
         return JsonResponse(list(subcategorias_ii), safe=False)
@@ -233,7 +245,6 @@ def subcategorias_ii(request):
 def subcategorias_iii(request):
     """
     Obtener Sub Categorías III (nivel 4) por categoría padre
-    Específicamente para ADULTO cuando viene de PSICOLOGIA
     """
     categoria_padre_id = request.GET.get('categoria_padre_id')
     if not categoria_padre_id:
@@ -242,15 +253,13 @@ def subcategorias_iii(request):
     try:
         subcategorias_iii = Categoria.objects.filter(
             categoria_padre_id=categoria_padre_id,
-            nivel=4  # Sub Categorías III son nivel 4
+            nivel=4
         ).values('id', 'nombre').order_by('nombre')
 
         return JsonResponse(list(subcategorias_iii), safe=False)
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
-
-
 
 
 @login_required
@@ -273,8 +282,6 @@ def categorias_old(request):
         categorias = Categoria.objects.filter(tipificacion_id=tipificacion_id).values('id', 'nombre')
         return JsonResponse(list(categorias), safe=False)
     return JsonResponse({'error': 'tipificacion_id requerido'}, status=400)
-
-
 
 
 @login_required
@@ -305,8 +312,6 @@ def segmentos_vi(request):
         return JsonResponse({'error': 'segmento_v_id requerido'}, status=400)
     data = SegmentoVI.objects.filter(segmento_v_id=segmento_v_id).values('id', 'nombre').order_by('nombre')
     return JsonResponse(list(data), safe=False)
-
-
 
 
 @login_required
